@@ -47,7 +47,26 @@ class DatabaseService {
         return firestore.deleteQuestion(questionId);
     }
     
+    // Answer-related methods
+    async createAnswer(answerData) {
+        return firestore.createAnswer(answerData);
+    }
 
+    async getAnswerById(id) {
+        return firestore.getAnswerById(id);
+    }
+
+    async listAnswers(filters = {}) {
+        return firestore.listAnswers(filters);
+    }
+
+    async updateAnswer(id, answerData) {
+        return firestore.updateAnswer(id, answerData);
+    }
+
+    async deleteAnswer(id) {
+        return firestore.deleteAnswer(id);
+    }
 }
 
 const database = new DatabaseService();
