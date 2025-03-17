@@ -1,28 +1,29 @@
 import { z } from 'zod';
-import { SUBJECTS, CLASS_LEVELS, DIFFICULTY_LEVELS, ORIGIN_TYPES, ANSWER_TYPES } from '../constants.js';
+import { SUBJECTS, CLASS_LEVELS, DIFFICULTY_LEVELS, ORIGIN_TYPES, ANSWER_TYPES, TEST_TYPES } from '../constants.js';
 
-// Define the test_info schema
+// Test info schema
 const testInfoSchema = z.object({
-  test_type: z.enum(['mock', 'prev_year']).optional(),
+  test_type: z.enum(TEST_TYPES),
   test_id: z.string().min(1, 'Test ID is required')
 });
 
-// Define schemas for different answer types
+// Answer metadata schemas for different types
 const inputAnswerSchema = z.object({
   answer_type: z.literal('input'),
+  correct_answer: z.string().min(1, 'Correct answer is required'),
   options: z.array(z.string()).optional().default([])
 });
 
 const singleSelectAnswerSchema = z.object({
   answer_type: z.literal('single-select'),
   options: z.array(z.string()).min(2, 'Single-select questions must have at least 2 options'),
-  correct_option: z.number().int().min(0, 'Correct option index must be provided').optional()
+  correct_option: z.number().int().min(0, 'Correct option index must be provided')
 });
 
 const multiSelectAnswerSchema = z.object({
   answer_type: z.literal('multi-select'),
   options: z.array(z.string()).min(2, 'Multi-select questions must have at least 2 options'),
-  correct_options: z.array(z.number().int().min(0)).optional()
+  correct_options: z.array(z.number().int().min(0)).min(1, 'At least one correct option must be provided')
 });
 
 // Combine answer schemas with discriminated union
@@ -32,8 +33,9 @@ const answerMetadataSchema = z.discriminatedUnion('answer_type', [
   multiSelectAnswerSchema
 ]);
 
-// Define the main question schema
+// Base question schema
 const baseQuestionSchema = z.object({
+  _id: z.string(),
   subject: z.enum(SUBJECTS, {
     errorMap: () => ({ message: `Subject must be one of: ${SUBJECTS.join(', ')}` })
   }),
@@ -47,29 +49,30 @@ const baseQuestionSchema = z.object({
   origin: z.enum(ORIGIN_TYPES, {
     errorMap: () => ({ message: `Origin must be one of: ${ORIGIN_TYPES.join(', ')}` })
   }),
-  test_info: z.union([
-    z.null(),
-    z.array(testInfoSchema)
-  ]),
+  test_info: z.array(testInfoSchema).nullable(),
   question_text: z.string().min(1, 'Question text is required'),
   question_attachments: z.array(z.string().url('Question attachment must be a valid URL')).optional().default([]),
   answer_metadata: answerMetadataSchema,
   tags: z.array(z.string()).optional().default([]),
   created_by: z.string().email('Created by must be a valid email'),
-  answer_attachments: z.record(z.string(), z.string().url('Answer attachment must be a valid URL')).optional().default({})
+  answer_attachments: z.record(z.string(), z.string().url('Answer attachment must be a valid URL')).optional().default({}),
+  createdAt: z.string().datetime('Created at must be a valid ISO datetime'),
+  updatedAt: z.string().datetime('Updated at must be a valid ISO datetime').optional()
 });
 
-// Now add the refinement as a separate step
+// Add refinement for test_info validation based on origin
 const questionSchema = baseQuestionSchema.refine(
   (data) => {
-    // If origin is mock_test or prev_year, test_info must be provided and not null
-    if ((data.origin === 'mock_test' || data.origin === 'prev_year')) {
+    if (data.origin === 'mock_test' || data.origin === 'prev_year') {
       return data.test_info !== null && Array.isArray(data.test_info) && data.test_info.length > 0;
     }
-    return true;
+    return data.test_info === null;
   },
   {
-    message: 'Test info is required for mock_test or prev_year questions',
+    message: (data) => 
+      data.origin === 'platform' 
+        ? 'Test info must be null for platform questions'
+        : 'Test info is required for mock_test or prev_year questions',
     path: ['test_info']
   }
 );
@@ -81,7 +84,6 @@ const questionSchema = baseQuestionSchema.refine(
  */
 export function validateQuestion(questionData) {
   try {
-    // Use safeParse instead of parse to get more detailed error information
     const result = questionSchema.safeParse(questionData);
     
     if (result.success) {
@@ -90,9 +92,7 @@ export function validateQuestion(questionData) {
         errors: []
       };
     } else {
-      // Format Zod validation errors
       const errors = result.error.errors.map(err => {
-        // Create a more user-friendly error message
         const path = err.path.join('.');
         return `${path ? path + ': ' : ''}${err.message}`;
       });
@@ -103,7 +103,6 @@ export function validateQuestion(questionData) {
       };
     }
   } catch (error) {
-    // Handle unexpected errors with more details
     console.error('Validation error:', error);
     return {
       isValid: false,

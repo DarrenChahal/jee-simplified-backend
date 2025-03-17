@@ -1,7 +1,7 @@
 // Test data for question validation
 // Run with: node test-questions.js
 
-import { validateQuestion } from './validators/questionValidator.js';
+import { validateQuestion } from '../validators/questionValidator.js';
 import { z } from 'zod';
 
 // Simple test to check if Zod is working properly

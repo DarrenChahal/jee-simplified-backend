@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { questionController } from './Controllers/questionController.js';
+import apiRoutes from './routes/index.js';
 
-const app = new express();
+const app = express();
 
 app.use(cors());
 
@@ -14,12 +14,8 @@ app.get('/', (req, res) => {
     res.json({ message: 'JEE Simplified API is running' });
 });
 
-// Question endpoints
-app.post('/api/questions', questionController.createQuestion);
-app.get('/api/questions/:id', questionController.getQuestion);
-app.get('/api/questions', questionController.listQuestions);
-app.put('/api/questions/:id', questionController.updateQuestion);
-app.delete('/api/questions/:id', questionController.deleteQuestion);
+// API routes
+app.use('/api', apiRoutes);
 
 // Start server
 app.listen(PORT, () => {
