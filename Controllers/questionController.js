@@ -1,5 +1,12 @@
 import database from '../services/database.js';
 import { validateQuestion } from '../validators/questionValidator.js';
+import PubSubPublisher from '../helpers/pubsubPublisher.js';
+import config from '../config/prod.js';
+
+const pubsubPublisher = new PubSubPublisher(
+    config.pubsub.questionWrite.project_id,
+    config.pubsub.questionWrite.topic_name
+);
 
 /**
  * Controller for handling question-related endpoints
@@ -22,20 +29,27 @@ export const questionController = {
                     errors: validation.errors
                 });
             }
+            console.info(`Published question_create event with messageId: ${messageId}`);
             
+            const messageId = await pubsubPublisher.publishEvent('question_create', questionData);
             // Create question in database
-            const result = await database.createQuestion(questionData);
+            // const result = await database.createQuestion(questionData);
             
-            return res.status(201).json({
+            // return res.status(201).json({
+            //     success: true,
+            //     message: 'Question created successfully',
+            //     data: result
+            // });
+            return res.status(202).json({
                 success: true,
-                message: 'Question created successfully',
-                data: result
+                message: 'Question creation event queued',
+                messageId
             });
         } catch (error) {
             console.error('Error in createQuestion controller:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Failed to create question',
+                message: 'Failed to queue question creation',
                 error: error.message
             });
         }
@@ -133,20 +147,27 @@ export const questionController = {
                     errors: validation.errors
                 });
             }
+            questionData.id = id;
+            const messageId = await pubsubPublisher.publishEvent('question_update', questionData);
+            console.info(`Published question_update event with messageId: ${messageId}`)
+            // // Update question in database
+            // const result = await database.updateQuestion(id, questionData);
             
-            // Update question in database
-            const result = await database.updateQuestion(id, questionData);
-            
-            return res.status(200).json({
+            // return res.status(200).json({
+            //     success: true,
+            //     message: 'Question updated successfully',
+            //     data: result
+            // });
+            return res.status(202).json({
                 success: true,
-                message: 'Question updated successfully',
-                data: result
+                message: 'Question update event queued',
+                messageId
             });
         } catch (error) {
             console.error('Error in updateQuestion controller:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Failed to update question',
+                message: 'Failed to queue question update',
                 error: error.message
             });
         }
@@ -182,6 +203,44 @@ export const questionController = {
                 message: 'Failed to delete question',
                 error: error.message
             });
+        }
+    },
+
+    // This endpoint is called by Pub/Sub (via push) to process question events.
+    // It will write to the database.
+    processQuestionWrite: async (req, res) => {
+        try {
+        // Pub/Sub push messages are received in a standard format.
+        const pubsubMessage = req.body.message;
+        if (!pubsubMessage || !pubsubMessage.data) {
+            return res.status(400).json({ success: false, message: 'Invalid Pub/Sub message format' });
+        }
+        const messageData = JSON.parse(Buffer.from(pubsubMessage.data, 'base64').toString());
+        const { eventType, payload } = messageData;
+
+        // Determine the operation to perform based on eventType
+        let result;
+        if (eventType === 'question_create') {
+            result = await database.createQuestion(payload);
+        } else if (eventType === 'question_update') {
+            const { id, ...updateData } = payload;
+            result = await database.updateQuestion(id, updateData);
+        } else {
+            return res.status(400).json({ success: false, message: 'Unknown event type' });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Question processed successfully',
+            data: result
+        });
+        } catch (error) {
+        console.error('Error processing question event:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to process question event',
+            error: error.message
+        });
         }
     }
 };
