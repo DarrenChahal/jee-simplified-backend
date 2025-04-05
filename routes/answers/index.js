@@ -4,11 +4,12 @@ import { answerController } from '../../Controllers/answerController.js';
 const router = express.Router();
 
 // answer endpoints
-router.post('/', questionController.submitAnswer);
-router.get('/:id', questionController.getAnswer);
-router.get('/', questionController.listAnswers);
-router.put('/:id', questionController.updateAnswer);
-router.delete('/:id', questionController.deleteAnswer);
+router.post('/', answerController.createAnswer);
+router.get('/:id', answerController.getAnswer);
+router.get('/', answerController.listAnswers);
+router.put('/:id', answerController.updateAnswer);
+router.delete('/:id', answerController.deleteAnswer);
+router.post('/subscriber', answerController.processAnswerWrite);
 
 //test specfifc asnwer endpoints
 router.get('/test/:testId',answerController.getTestAnswers);

@@ -1,5 +1,12 @@
 import database from '../services/database.js';
 import { validateAnswer } from '../validators/answerValidator.js';
+import { pubsubPublisher } from '../helpers/pubsubPublisher.js';    
+import config from '../config/prod.js';
+
+const pubsubPublisher = new pubsubPublisher(
+    config.pubsub.answerWrite.project_id,
+    config.pubsub.answerWrite.topic_name
+);
 
 /**
  * Controller for handling answer-related endpoints
@@ -23,19 +30,28 @@ export const answerController = {
                 });
             }
             
-            // Create answer in database
-            const result = await database.createAnswer(answerData);
+            const messageId = await pubsubPublisher.publishEvent('answer_create', answerData);
+            console.info(`Published answer_create event with messageId: ${messageId}`);
+
+            // // Create answer in database
+            // const result = await database.createAnswer(answerData);
             
-            return res.status(201).json({
+            // return res.status(201).json({
+            //     success: true,
+            //     message: 'Answer created successfully',
+            //     data: result
+            // });
+            
+            return res.status(202).json({
                 success: true,
-                message: 'Answer created successfully',
-                data: result
+                message: 'Answer creation event queued',
+                messageId
             });
         } catch (error) {
             console.error('Error in createAnswer controller:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Failed to create answer',
+                message: 'Failed to queue answer creation',
                 error: error.message
             });
         }
@@ -132,19 +148,28 @@ export const answerController = {
                 });
             }
             
-            // Update answer in database
-            const result = await database.updateAnswer(id, answerData);
+            const messageId = await pubsubPublisher.publishEvent('answer_update', answerData, id);
+            console.info(`Published answer_update event with messageId: ${messageId}`);
             
-            return res.status(200).json({
-                success: true,
-                message: 'Answer updated successfully',
-                data: result
+            // // Update answer in database
+            // const result = await database.updateAnswer(id, answerData);
+            
+            // return res.status(200).json({
+            //     success: true,
+            //     message: 'Answer updated successfully',
+            //     data: result
+            // });
+            
+            return res.status(202).json({
+                    success: true,
+                message: 'Answer update event queued',
+                messageId
             });
         } catch (error) {
             console.error('Error in updateAnswer controller:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Failed to update answer',
+                message: 'Failed to queue answer update',
                 error: error.message
             });
         }
@@ -178,6 +203,42 @@ export const answerController = {
             return res.status(500).json({
                 success: false,
                 message: 'Failed to delete answer',
+                error: error.message
+            });
+        }
+    },
+
+    processAnswerWrite: async (req, res) => {
+        try {
+            // Pub/Sub push messages are received in a standard format.
+            const pubsubMessage = req.body.message;
+            if (!pubsubMessage || !pubsubMessage.data) {
+                return res.status(400).json({ success: false, message: 'Invalid Pub/Sub message format' });
+            }
+            const messageData = JSON.parse(Buffer.from(pubsubMessage.data, 'base64').toString());
+            const { eventType, payload } = messageData;
+
+            // Determine the operation to perform based on eventType
+            let result;
+            if (eventType === 'answer_create') {
+                result = await database.createAnswer(payload);
+            } else if (eventType === 'answer_update') {
+                const { id, ...updateData } = payload;
+                result = await database.updateAnswer(id, updateData);
+            } else {
+                return res.status(400).json({ success: false, message: 'Unknown event type' });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: 'Answer processed successfully',
+                data: result
+            });
+        } catch (error) {
+            console.error('Error in processAnswerWrite controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to process answer write',
                 error: error.message
             });
         }

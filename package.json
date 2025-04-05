@@ -2,6 +2,7 @@
   "type": "module",
   "dependencies": {
     "@google-cloud/firestore": "^7.11.0",
+    "@google-cloud/pubsub": "^4.11.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.21.2",
@@ -13,8 +14,8 @@
     "test": "mocha tests/**/*.js"
   },
   "devDependencies": {
-    "mocha": "^10.0.0",
     "chai": "^4.3.7",
+    "mocha": "^10.0.0",
     "sinon": "^15.0.1"
   }
 }
