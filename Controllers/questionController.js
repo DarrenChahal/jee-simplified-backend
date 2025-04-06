@@ -29,9 +29,9 @@ export const questionController = {
                     errors: validation.errors
                 });
             }
-            console.info(`Published question_create event with messageId: ${messageId}`);
             
             const messageId = await pubsubPublisher.publishEvent('question_create', questionData);
+            console.info(`Published question_create event with messageId: ${messageId}`);
             // Create question in database
             // const result = await database.createQuestion(questionData);
             

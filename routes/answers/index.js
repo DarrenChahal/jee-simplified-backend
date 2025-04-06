@@ -11,9 +11,4 @@ router.put('/:id', answerController.updateAnswer);
 router.delete('/:id', answerController.deleteAnswer);
 router.post('/subscriber', answerController.processAnswerWrite);
 
-//test specfifc asnwer endpoints
-router.get('/test/:testId',answerController.getTestAnswers);
-router.get('/test/:userId',answerController.getUserAnswers);
-router.get('/question/:questionsId',answerController.getQuestionAnswers);
-
 export default router;

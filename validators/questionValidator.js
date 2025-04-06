@@ -35,7 +35,7 @@ const answerMetadataSchema = z.discriminatedUnion('answer_type', [
 
 // Base question schema
 const baseQuestionSchema = z.object({
-  _id: z.string(),
+  _id: z.string().optional(),
   subject: z.enum(SUBJECTS, {
     errorMap: () => ({ message: `Subject must be one of: ${SUBJECTS.join(', ')}` })
   }),
@@ -56,7 +56,7 @@ const baseQuestionSchema = z.object({
   tags: z.array(z.string()).optional().default([]),
   created_by: z.string().email('Created by must be a valid email'),
   answer_attachments: z.record(z.string(), z.string().url('Answer attachment must be a valid URL')).optional().default({}),
-  createdAt: z.string().datetime('Created at must be a valid ISO datetime'),
+  createdAt: z.string().datetime('Created at must be a valid ISO datetime').optional(),
   updatedAt: z.string().datetime('Updated at must be a valid ISO datetime').optional()
 });
 

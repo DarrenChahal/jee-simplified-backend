@@ -7,14 +7,6 @@ import fs from 'fs';
 // Load environment variables
 dotenv.config();
 
-// Get the directory name in ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..');
-
-// Set the environment variable for Google Cloud authentication
-// This is the recommended way to use service account credentials with Google Cloud client libraries
-process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(projectRoot, 'ivory-sentry-453910-q6-1b8c49f790f5.json');
 
 // Initialize Firestore
 const db = new Firestore({
@@ -90,7 +82,7 @@ class FirestoreService {
             const docRef = await db.collection('questions').add(documentData);
             
             // Update the document data with the generated ID
-            documentData._id = docRef.id;
+            documentData._id = docRef.id; //updates local varibale not the firestore document
             
             return documentData;
         } catch (error) {

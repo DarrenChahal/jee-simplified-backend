@@ -1,0 +1,52 @@
+steps:
+  # Access the service account secret
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'access-secret'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Fetching secret..."
+        gcloud secrets versions access latest --secret=${_SVC_ACCOUNT_JSON} > config.json
+
+  # Activate service account
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'use-service-account'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud auth activate-service-account --key-file=config.json
+
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--build-arg', 'GOOGLE_APPLICATION_CREDENTIALS=config.json', '-f', '${_DOCKERFILE}', '.']
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}']
+
+  # Deploy main API service to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['run', 'deploy', '${_SERVICE_NAME}', '--image', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--region', 'us-central1', '--platform', 'managed']
+  
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['run', 'services', 'update-traffic', '${_SERVICE_NAME}', '--to-latest', '--region', 'us-central1']  
+
+  # Deploy PubSub service to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['run', 'deploy', '${_SERVICE_NAME_PUBSUB}', '--image', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--region', 'us-central1', '--platform', 'managed']
+  
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['run', 'services', 'update-traffic', '${_SERVICE_NAME_PUBSUB}', '--to-latest', '--region', 'us-central1']
+
+substitutions:
+  _PROJECT_ID: 'ivory-sentry-453910-q6'
+  _IMAGE_NAME: 'jee-simplified-backend'
+  _AUTO_TAG: '1.0.0'
+  _DOCKERFILE: 'prod.Dockerfile'
+  _SERVICE_NAME: 'jee-simplified-api'
+  _SERVICE_NAME_PUBSUB: 'jee-simplified-pubsub'
+  _SVC_ACCOUNT_JSON: 'jee-simplified-1'
+
+# Run: gcloud builds submit --config=cloudbuild.yaml

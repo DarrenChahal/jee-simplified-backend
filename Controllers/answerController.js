@@ -1,9 +1,9 @@
 import database from '../services/database.js';
 import { validateAnswer } from '../validators/answerValidator.js';
-import { pubsubPublisher } from '../helpers/pubsubPublisher.js';    
+import PubSubPublisher from '../helpers/pubsubPublisher.js'; 
 import config from '../config/prod.js';
 
-const pubsubPublisher = new pubsubPublisher(
+const pubsubPublisher = new PubSubPublisher(
     config.pubsub.answerWrite.project_id,
     config.pubsub.answerWrite.topic_name
 );
