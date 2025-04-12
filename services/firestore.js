@@ -1,8 +1,5 @@
-import { Firestore, Timestamp } from '@google-cloud/firestore';
+import { Firestore } from '@google-cloud/firestore';
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 
 // Load environment variables
 dotenv.config();
@@ -27,6 +24,15 @@ class FirestoreService {
      */
     #getQuestionDocument(questionId) {
         return db.collection('questions').doc(questionId);
+    }
+    
+    /**
+     * Get a reference to a template document
+     * @param {string} templateId - The ID of the template
+     * @returns {FirebaseFirestore.DocumentReference}
+     */
+    #getTemplateDocument(templateId) {
+        return db.collection('templates').doc(templateId);
     }
     
     /**
@@ -74,8 +80,8 @@ class FirestoreService {
             const documentData = {
                 ...questionData,
                 questionNumber, // Add the auto-incremented question number
-                createdAt: questionData.createdAt || Timestamp.now(),
-                updatedAt: Timestamp.now()
+                createdAt: questionData.createdAt || Date.now(),
+                updatedAt: Date.now()
             };
             
             // Let Firestore generate the ID
@@ -169,7 +175,7 @@ class FirestoreService {
             // Update the document in Firestore
             const updatedData = {
                 ...questionData,
-                updatedAt: Timestamp.now()
+                updatedAt: Date.now()
             };
             
             const docRef = this.#getQuestionDocument(questionId);
@@ -199,7 +205,137 @@ class FirestoreService {
         }
     }
     
-
+    /**
+     * Creates a new template in the database
+     * @param {Object} templateData - The template data to store
+     * @returns {Promise<Object>} - The created template document
+     */
+    async createTemplate(templateData) {
+        try {
+            // Generate 13-digit Unix timestamps
+            const currentTime = Date.now();
+            
+            // Prepare the document data
+            const documentData = {
+                ...templateData,
+                createdAt: currentTime,
+                updatedAt: currentTime
+            };
+            
+            // Let Firestore generate the ID
+            const docRef = await db.collection('templates').add(documentData);
+            
+            // Update the document data with the generated ID
+            documentData._id = docRef.id;
+            
+            return documentData;
+        } catch (error) {
+            console.error('Error creating template:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Gets a template by ID
+     * @param {string} templateId - The ID of the template to retrieve
+     * @returns {Promise<Object>} - The template document
+     */
+    async getTemplateById(templateId) {
+        try {
+            const docRef = this.#getTemplateDocument(templateId);
+            const snapshot = await docRef.get();
+            
+            if (!snapshot.exists) {
+                throw new Error('Template not found');
+            }
+            
+            return { ...snapshot.data(), _id: snapshot.id };
+        } catch (error) {
+            console.error('Error getting template:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Lists templates with optional filters
+     * @param {Object} filters - Optional filters for the query
+     * @returns {Promise<Object>} - The list of template documents
+     */
+    async listTemplates(filters = {}) {
+        try {
+            let query = db.collection('templates');
+            
+            // Add filters if provided
+            if (filters.difficulty) {
+                query = query.where('difficulty', '==', filters.difficulty);
+            }
+            
+            // Execute the query
+            const snapshot = await query.get();
+            
+            // Format the results
+            let documents = [];
+            snapshot.forEach(doc => {
+                documents.push({ ...doc.data(), _id: doc.id });
+            });
+            
+            // Filter by subject if provided (can't do this in query because subject is an array)
+            if (filters.subject) {
+                documents = documents.filter(doc => 
+                    doc.subject && doc.subject.includes(filters.subject)
+                );
+            }
+            
+            return { documents };
+        } catch (error) {
+            console.error('Error listing templates:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Updates a template by ID
+     * @param {string} templateId - The ID of the template to update
+     * @param {Object} templateData - The updated template data
+     * @returns {Promise<Object>} - The updated template document
+     */
+    async updateTemplate(templateId, templateData) {
+        try {
+            // Generate 13-digit Unix timestamp for update time
+            const currentTime = Date.now();
+            
+            // Update the document in Firestore
+            const updatedData = {
+                ...templateData,
+                updatedAt: currentTime
+            };
+            
+            const docRef = this.#getTemplateDocument(templateId);
+            await docRef.update(updatedData);
+            
+            // Get the updated document
+            return this.getTemplateById(templateId);
+        } catch (error) {
+            console.error('Error updating template:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Deletes a template by ID
+     * @param {string} templateId - The ID of the template to delete
+     * @returns {Promise<boolean>} - True if deletion was successful
+     */
+    async deleteTemplate(templateId) {
+        try {
+            const docRef = this.#getTemplateDocument(templateId);
+            await docRef.delete();
+            return true;
+        } catch (error) {
+            console.error('Error deleting template:', error);
+            throw error;
+        }
+    }
 }
 
 const firestore = new FirestoreService();

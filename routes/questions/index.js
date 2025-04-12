@@ -9,6 +9,8 @@ router.get('/:id', questionController.getQuestion);
 router.get('/', questionController.listQuestions);
 router.put('/:id', questionController.updateQuestion);
 router.delete('/:id', questionController.deleteQuestion);
+
+// pub sub endpoint
 router.post('/subscriber', questionController.processQuestionWrite);
 
 export default router;

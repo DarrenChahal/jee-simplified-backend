@@ -67,6 +67,53 @@ class DatabaseService {
     async deleteAnswer(id) {
         return firestore.deleteAnswer(id);
     }
+    
+    // Template-related methods
+    /**
+     * Creates a new template in the database
+     * @param {Object} templateData - The template data to store
+     * @returns {Promise<Object>} - The created template document
+     */
+    async createTemplate(templateData) {
+        return firestore.createTemplate(templateData);
+    }
+    
+    /**
+     * Gets a template by ID
+     * @param {string} templateId - The ID of the template to retrieve
+     * @returns {Promise<Object>} - The template document
+     */
+    async getTemplateById(templateId) {
+        return firestore.getTemplateById(templateId);
+    }
+    
+    /**
+     * Lists templates with optional filters
+     * @param {Object} filters - Optional filters for the query
+     * @returns {Promise<Object>} - The list of template documents
+     */
+    async listTemplates(filters = {}) {
+        return firestore.listTemplates(filters);
+    }
+    
+    /**
+     * Updates a template by ID
+     * @param {string} templateId - The ID of the template to update
+     * @param {Object} templateData - The updated template data
+     * @returns {Promise<Object>} - The updated template document
+     */
+    async updateTemplate(templateId, templateData) {
+        return firestore.updateTemplate(templateId, templateData);
+    }
+    
+    /**
+     * Deletes a template by ID
+     * @param {string} templateId - The ID of the template to delete
+     * @returns {Promise<boolean>} - True if deletion was successful
+     */
+    async deleteTemplate(templateId) {
+        return firestore.deleteTemplate(templateId);
+    }
 }
 
 const database = new DatabaseService();
