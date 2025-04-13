@@ -36,6 +36,16 @@ class FirestoreService {
     }
     
     /**
+     * Get a reference to a test document
+     * @param {string} testId - The ID of the test
+     * @returns {FirebaseFirestore.DocumentReference}
+     * @private
+     */
+    #getTestDocument(testId) {
+        return db.collection('tests').doc(testId);
+    }
+    
+    /**
      * Get the next question number from the counter
      * @returns {Promise<number>} - The next question number
      * @private
@@ -333,6 +343,151 @@ class FirestoreService {
             return true;
         } catch (error) {
             console.error('Error deleting template:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Creates a new test in the database
+     * @param {Object} testData - The test data to store
+     * @returns {Promise<Object>} - The created test document
+     */
+    async createTest(testData) {
+        try {
+            // Set institute default if not provided
+            const institute = testData.institute || "jee-simplified";
+            
+            // Prepare document data with all required fields
+            const documentData = {
+                ...testData,
+                created_at: testData.created_at || Date.now(),
+                updated_at: testData.updated_at || Date.now(),
+                are_questions_public: testData.are_questions_public !== undefined ? testData.are_questions_public : false,
+                institute: institute,
+                registered_count: testData.registered_count || 0,
+                questions_collection_name: `${institute}_test_questions`,
+                test_pattern: testData.test_pattern || 'none'
+            };
+            
+            // Create document and get the reference
+            const docRef = await db.collection('tests').add(documentData);
+            const testId = docRef.id;
+            
+            // Add bucket path to the test document
+            const bucketPath = `test_questions_attachments/${institute}/${testId}`;
+            await docRef.update({ bucket_path: bucketPath });
+            
+            // Get the updated document
+            const updatedDoc = await docRef.get();
+            return { ...updatedDoc.data(), _id: testId };
+            
+        } catch (error) {
+            console.error('Error creating test:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Gets a test by ID
+     * @param {string} testId - The ID of the test to retrieve
+     * @returns {Promise<Object>} - The test document
+     */
+    async getTestById(testId) {
+        try {
+            const docRef = this.#getTestDocument(testId);
+            const snapshot = await docRef.get();
+            
+            if (!snapshot.exists) {
+                throw new Error('Test not found');
+            }
+            
+            return { ...snapshot.data(), _id: snapshot.id };
+        } catch (error) {
+            console.error('Error getting test:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Lists tests with optional filters
+     * @param {Object} filters - Optional filters for the query
+     * @returns {Promise<Object>} - The list of test documents
+     */
+    async listTests(filters = {}) {
+        try {
+            let query = db.collection('tests');
+            
+            // Add filters if provided
+            if (filters.subjects) {
+                query = query.where('subjects', 'array-contains', filters.subjects);
+            }
+            
+            if (filters.difficulty) {
+                query = query.where('difficulty', '==', filters.difficulty);
+            }
+            
+            if (filters.institute) {
+                query = query.where('institute', '==', filters.institute);
+            }
+            
+            if (filters.status) {
+                query = query.where('status', '==', filters.status);
+            }
+            
+            // Execute the query
+            const snapshot = await query.get();
+            
+            // Format the results
+            const documents = [];
+            snapshot.forEach(doc => {
+                documents.push({ ...doc.data(), _id: doc.id });
+            });
+            
+            return { documents };
+        } catch (error) {
+            console.error('Error listing tests:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Updates a test by ID
+     * @param {string} testId - The ID of the test to update
+     * @param {Object} testData - The updated test data
+     * @returns {Promise<Object>} - The updated test document
+     */
+    async updateTest(testId, testData) {
+        try {
+            // Update the document in Firestore
+            const updatedData = {
+                ...testData,
+                updated_at: Date.now()
+            };
+            
+            const docRef = this.#getTestDocument(testId);
+            await docRef.update(updatedData);
+            
+            // Get the updated document
+            return this.getTestById(testId);
+        } catch (error) {
+            console.error('Error updating test:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Deletes a test by ID
+     * @param {string} testId - The ID of the test to delete
+     * @returns {Promise<boolean>} - True if deletion was successful
+     */
+    async deleteTest(testId) {
+        try {
+            const docRef = this.#getTestDocument(testId);
+            await docRef.delete();
+            
+            return true;
+        } catch (error) {
+            console.error('Error deleting test:', error);
             throw error;
         }
     }

@@ -249,7 +249,193 @@ const testCases = [
 console.log("Testing Question Validation Schema\n");
 console.log("=================================\n");
 
+// Legacy test cases - commented out
+/*
 testCases.forEach(testCase => {
+  console.log(`Test: ${testCase.name}`);
+  try {
+    const result = validateQuestion(testCase.data);
+    
+    if (result.isValid) {
+      console.log("✅ VALID");
+    } else {
+      console.log("❌ INVALID");
+      console.log("Errors:");
+      result.errors.forEach(error => {
+        console.log(`  - ${error}`);
+      });
+    }
+  } catch (error) {
+    console.log("❌ ERROR DURING VALIDATION");
+    console.log("Error details:");
+    console.log(error);
+  }
+  console.log("\n");
+});
+*/
+
+// New test cases using updated schema
+const newTestCases = [
+  {
+    name: "Valid input question (prev_year origin)",
+    data: {
+      "_id": "q123",
+      "subjects": ["Physics"],
+      "for_class": ["11", "12", "dropper"],
+      "topics": ["Mechanics"],
+      "difficulty": "Medium",
+      "origin": {
+        "type": "prev_year",
+        "exam": "JEE-Main",
+        "year": 2023,
+        "session": "May",
+        "paper": "Paper 1",
+        "test_id": "test456"
+      },
+      "question_text": "A block of mass m slides down a frictionless inclined plane with angle θ. What is the acceleration of the block?",
+      "attachments": [
+        "gs://bucket/diagram.png"
+      ],
+      "answer": {
+        "type": "input",
+        "options": [],
+        "correct_answer": "g*sin(θ)",
+        "solution": "The force acting along the inclined plane is mg*sin(θ), and using Newton's Second Law, we get a = g*sin(θ)"
+      },
+      "tags": ["JEE", "Mechanics", "Friction"],
+      "created_by": "user_abc",
+      "created_at": currentTimestamp,
+      "updated_at": currentTimestamp
+    }
+  },
+  {
+    name: "Valid single choice question (mock origin)",
+    data: {
+      "_id": "q124",
+      "subjects": ["Chemistry"],
+      "for_class": ["12"],
+      "topics": ["Electrochemistry"],
+      "difficulty": "Hard",
+      "origin": {
+        "type": "mock",
+        "exam": "JEE-Advanced",
+        "test_id": "test789"
+      },
+      "question_text": "What is the standard reduction potential of the following half-cell reaction?\n2H+ + 2e- → H2",
+      "attachments": [],
+      "answer": {
+        "type": "single_choice",
+        "options": ["0.00 V", "0.76 V", "-0.76 V", "1.23 V"],
+        "correct_answer": 0,
+        "solution": "By definition, the standard hydrogen electrode has a standard reduction potential of 0.00 V."
+      },
+      "tags": ["JEE", "Electrochemistry", "Redox reactions"],
+      "created_by": "user_def",
+      "created_at": currentTimestamp,
+      "updated_at": currentTimestamp
+    }
+  },
+  {
+    name: "Valid multi choice question (platform origin)",
+    data: {
+      "_id": "q125",
+      "subjects": ["Mathematics"],
+      "for_class": ["11", "12"],
+      "topics": ["Functions"],
+      "difficulty": "Medium",
+      "origin": {
+        "type": "platform",
+        "exam": "JEE-Main"
+      },
+      "question_text": "Which of the following functions are continuous at x = 0? Select all that apply.",
+      "attachments": [],
+      "answer": {
+        "type": "multi_choice",
+        "options": [
+          "f(x) = |x|",
+          "f(x) = sin(x)/x, f(0) = 1",
+          "f(x) = floor(x)",
+          "f(x) = x^2 * sin(1/x), f(0) = 0"
+        ],
+        "correct_answer": [0, 1, 3],
+        "solution": "Functions 1, 2, and 4 satisfy the continuity conditions at x = 0, while function 3 has a jump discontinuity at x = 0."
+      },
+      "tags": ["JEE", "Calculus", "Continuity"],
+      "created_by": "user_ghi",
+      "created_at": currentTimestamp,
+      "updated_at": currentTimestamp
+    }
+  },
+  {
+    name: "Invalid: Missing required field (subjects)",
+    data: {
+      "_id": "invalid_q001",
+      // subjects array intentionally omitted
+      "for_class": ["11"],
+      "topics": ["Mechanics"],
+      "difficulty": "Medium",
+      "origin": {
+        "type": "platform",
+        "exam": "JEE-Main"
+      },
+      "question_text": "A block slides down an incline. Determine its acceleration.",
+      "answer": {
+        "type": "input",
+        "correct_answer": "g·sin(θ)"
+      },
+      "created_by": "user_xyz",
+      "created_at": currentTimestamp
+    }
+  },
+  {
+    name: "Invalid: Mock origin without test_id",
+    data: {
+      "_id": "invalid_q002",
+      "subjects": ["Physics"],
+      "for_class": ["12"],
+      "topics": ["Optics"],
+      "difficulty": "Easy",
+      "origin": {
+        "type": "mock",
+        "exam": "JEE-Main"
+        // test_id is required for mock type but missing
+      },
+      "question_text": "What is the focal length of a convex lens?",
+      "answer": {
+        "type": "input",
+        "correct_answer": "25 cm"
+      },
+      "created_by": "user_abc",
+      "created_at": currentTimestamp
+    }
+  },
+  {
+    name: "Invalid: Single-choice with insufficient options",
+    data: {
+      "_id": "invalid_q003",
+      "subjects": ["Chemistry"],
+      "for_class": ["11"],
+      "topics": ["Chemical Bonding"],
+      "difficulty": "Medium",
+      "origin": {
+        "type": "platform",
+        "exam": "JEE-Advanced"
+      },
+      "question_text": "Which of the following has a covalent bond?",
+      "answer": {
+        "type": "single_choice",
+        "options": ["NaCl"], // Not enough options
+        "correct_answer": 0
+      },
+      "created_by": "user_abc",
+      "created_at": currentTimestamp
+    }
+  }
+];
+
+// Run tests with new schema
+console.log("Testing with updated schema:");
+newTestCases.forEach(testCase => {
   console.log(`Test: ${testCase.name}`);
   try {
     const result = validateQuestion(testCase.data);

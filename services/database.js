@@ -114,6 +114,53 @@ class DatabaseService {
     async deleteTemplate(templateId) {
         return firestore.deleteTemplate(templateId);
     }
+    
+    // Test-related methods
+    /**
+     * Creates a new test in the database
+     * @param {Object} testData - The test data to store
+     * @returns {Promise<Object>} - The created test document
+     */
+    async createTest(testData) {
+        return firestore.createTest(testData);
+    }
+    
+    /**
+     * Gets a test by ID
+     * @param {string} testId - The ID of the test to retrieve
+     * @returns {Promise<Object>} - The test document
+     */
+    async getTestById(testId) {
+        return firestore.getTestById(testId);
+    }
+    
+    /**
+     * Lists tests with optional filters
+     * @param {Object} filters - Optional filters for the query
+     * @returns {Promise<Object>} - The list of test documents
+     */
+    async listTests(filters = {}) {
+        return firestore.listTests(filters);
+    }
+    
+    /**
+     * Updates a test by ID
+     * @param {string} testId - The ID of the test to update
+     * @param {Object} testData - The updated test data
+     * @returns {Promise<Object>} - The updated test document
+     */
+    async updateTest(testId, testData) {
+        return firestore.updateTest(testId, testData);
+    }
+    
+    /**
+     * Deletes a test by ID
+     * @param {string} testId - The ID of the test to delete
+     * @returns {Promise<boolean>} - True if deletion was successful
+     */
+    async deleteTest(testId) {
+        return firestore.deleteTest(testId);
+    }
 }
 
 const database = new DatabaseService();
