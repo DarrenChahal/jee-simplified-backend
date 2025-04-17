@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { SUBJECTS, CLASS_LEVELS, DIFFICULTY_LEVELS, ORIGIN_TYPES, ANSWER_TYPES, EXAM_TYPES, TEST_TYPES } from '../constants.js';
+import { SUBJECTS, CLASS_LEVELS, DIFFICULTY_LEVELS, ORIGIN_TYPES, ANSWER_TYPES, TEST_TYPES, TEST_PATTERN } from '../constants.js';
 
 // Origin schema with discriminated union based on type
 const originBaseSchema = z.object({
   type: z.enum(ORIGIN_TYPES),
-  exam: z.enum(EXAM_TYPES),
+  exam: z.enum(TEST_PATTERN),
 });
 
 const prevYearOriginSchema = originBaseSchema.extend({
