@@ -44,7 +44,8 @@ export const validateTest = (testData) => {
         if (result.success) {
             return {
                 isValid: true,
-                errors: []
+                errors: [],
+                data: result.data
             };
         } else {
             const errors = result.error.errors.map(err => {

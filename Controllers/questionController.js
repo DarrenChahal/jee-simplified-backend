@@ -29,17 +29,9 @@ export const questionController = {
                     errors: validation.errors
                 });
             }
-            
-            const messageId = await pubsubPublisher.publishEvent('question_create', questionData);
+            const validatedQuestionData = validation.data;
+            const messageId = await pubsubPublisher.publishEvent('question_create', validatedQuestionData);
             console.info(`Published question_create event with messageId: ${messageId}`);
-            // Create question in database
-            // const result = await database.createQuestion(questionData);
-            
-            // return res.status(201).json({
-            //     success: true,
-            //     message: 'Question created successfully',
-            //     data: result
-            // });
             return res.status(202).json({
                 success: true,
                 message: 'Question creation event queued',

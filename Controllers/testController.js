@@ -22,9 +22,9 @@ export const testController = {
                     errors: validation.errors
                 });
             }
-            
+            const validatedTestData = validation.data;
             // Create test in database
-            const result = await database.createTest(testData);
+            const result = await database.createTest(validatedTestData);
             
             return res.status(201).json({
                 success: true,
@@ -128,13 +128,13 @@ export const testController = {
             testData.updated_at = Date.now();
             
             // Validate test data
-            const validation = validateTest(testData);
-            if (!validation.isValid) {
-                return res.status(400).json({
-                    success: false,
-                    errors: validation.errors
-                });
-            }
+            // const validation = validateTest(testData);
+            // if (!validation.isValid) {
+            //     return res.status(400).json({
+            //         success: false,
+            //         errors: validation.errors
+            //     });
+            // }
             
             // Update test in database
             const result = await database.updateTest(id, testData);

@@ -45,8 +45,23 @@ const inputAnswerSchema = answerBaseSchema.extend({
 const singleChoiceAnswerSchema = answerBaseSchema.extend({
   type: z.literal('single_choice'),
   options: z.array(z.string()).min(2, 'Single-choice questions must have at least 2 options'),
-  correct_answer: z.number().int().min(0, 'Correct option index must be provided'),
+  correct_answer: z.string()
+    .transform((val, ctx) => {
+      const parsed = parseInt(val, 10);
+      if (isNaN(parsed)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Correct option must be a number',
+        });
+        return z.NEVER;
+      }
+      return parsed;
+    })
+    .refine((val) => val >= 0, {
+      message: 'Correct option index must be provided',
+    }),
 });
+
 
 const multiChoiceAnswerSchema = answerBaseSchema.extend({
   type: z.literal('multi_choice'),
@@ -65,6 +80,7 @@ const questionSchema = z.object({
   _id: z.string().optional(),
   subjects: z.array(z.enum(SUBJECTS)).min(1, 'At least one subject is required'),
   for_class: z.array(z.enum(CLASS_LEVELS)).min(1, 'At least one class level is required'),
+  institute: z.string().default('jee-simplified'),
   topics: z.array(z.string()).min(1, 'At least one topic is required'),
   difficulty: z.enum(DIFFICULTY_LEVELS, {
     errorMap: () => ({ message: `Difficulty must be one of: ${DIFFICULTY_LEVELS.join(', ')}` })
@@ -91,7 +107,8 @@ export function validateQuestion(questionData) {
     if (result.success) {
       return {
         isValid: true,
-        errors: []
+        errors: [],
+        data: result.data
       };
     } else {
       const errors = result.error.errors.map(err => {

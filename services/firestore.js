@@ -7,8 +7,8 @@ dotenv.config();
 
 // Initialize Firestore
 const db = new Firestore({
-    projectId: process.env.GCLOUD_PROJECT_ID || 'ivory-sentry-453910-q6',
-    databaseId: process.env.DATABASE_ID || 'jee-simplified'
+    projectId: process.env.GCLOUD_PROJECT_ID,
+    databaseId: process.env.DATABASE_ID
 });
 
 // Verify connection
@@ -20,9 +20,20 @@ class FirestoreService {
     /**
      * Get a reference to a question document
      * @param {string} questionId - The ID of the question
+     * @param {Object} questionData - Optional question data to determine location
      * @returns {FirebaseFirestore.DocumentReference}
      */
-    #getQuestionDocument(questionId) {
+    #getQuestionDocument(questionId, questionData = null) {
+        // If this is a mock test question, use the specific path
+        if (questionData && 
+            questionData.origin && 
+            questionData.origin.type === 'mock' && 
+            questionData.institute && 
+            questionData.origin.test_id) {
+            return db.collection(`institutes/${questionData.institute}/test_questions/${questionData.origin.test_id}/questions`).doc(questionId);
+        }
+        
+        // Otherwise use the main questions collection
         return db.collection('questions').doc(questionId);
     }
     
@@ -90,15 +101,26 @@ class FirestoreService {
             const documentData = {
                 ...questionData,
                 questionNumber, // Add the auto-incremented question number
-                createdAt: questionData.createdAt || Date.now(),
-                updatedAt: Date.now()
+                created_at: questionData.created_at || Date.now(),
+                updated_at: questionData.updated_at || Date.now()
             };
+
+            let docRef;
             
-            // Let Firestore generate the ID
-            const docRef = await db.collection('questions').add(documentData);
+            // If this is a mock test question, store it in the specific path
+            if (documentData.origin && 
+                documentData.origin.type === 'mock' && 
+                documentData.institute && 
+                documentData.origin.test_id) {
+                const collectionPath = `institutes/${documentData.institute}/test_questions/${documentData.origin.test_id}/questions`;
+                docRef = await db.collection(collectionPath).add(documentData);
+            } else {
+                // Otherwise store in the main questions collection
+                docRef = await db.collection('questions').add(documentData);
+            }
             
             // Update the document data with the generated ID
-            documentData._id = docRef.id; //updates local varibale not the firestore document
+            documentData._id = docRef.id; //updates local variable not the firestore document
             
             return documentData;
         } catch (error) {
@@ -110,11 +132,26 @@ class FirestoreService {
     /**
      * Gets a question by ID
      * @param {string} questionId - The ID of the question to retrieve
+     * @param {Object} options - Optional parameters (institute, testId)
      * @returns {Promise<Object>} - The question document
      */
-    async getQuestionById(questionId) {
+    async getQuestionById(questionId, options = {}) {
         try {
-            const docRef = this.#getQuestionDocument(questionId);
+            let docRef;
+            
+            // If we have institute and testId, check the mock test questions collection first
+            if (options.institute && options.test_id) {
+                const mockPath = `institutes/${options.institute}/test_questions/${options.test_id}/questions`;
+                docRef = db.collection(mockPath).doc(questionId);
+                const mockSnapshot = await docRef.get();
+                
+                if (mockSnapshot.exists) {
+                    return { ...mockSnapshot.data(), _id: mockSnapshot.id };
+                }
+            }
+            
+            // If not found or no options provided, check the main questions collection
+            docRef = db.collection('questions').doc(questionId);
             const snapshot = await docRef.get();
             
             if (!snapshot.exists) {
@@ -135,6 +172,27 @@ class FirestoreService {
      */
     async listQuestions(filters = {}) {
         try {
+            let documents = [];
+            
+            // If we're searching for mock test questions and have institute and testId
+            if (filters.origin === 'mock' && filters.institute && filters.test_id) {
+                const collectionPath = `institutes/${filters.institute}/test_questions/${filters.test_id}/questions`;
+                let query = db.collection(collectionPath);
+                
+                // Apply filters that work on both collections
+                if (filters.difficulty) {
+                    query = query.where('difficulty', '==', filters.difficulty);
+                }
+                
+                const mockSnapshot = await query.get();
+                mockSnapshot.forEach(doc => {
+                    documents.push({ ...doc.data(), _id: doc.id });
+                });
+                
+                return { documents };
+            }
+            
+            // Otherwise, search the main questions collection
             let query = db.collection('questions');
             
             // Add filters if provided
@@ -162,7 +220,6 @@ class FirestoreService {
             const snapshot = await query.get();
             
             // Format the results
-            const documents = [];
             snapshot.forEach(doc => {
                 documents.push({ ...doc.data(), _id: doc.id });
             });
@@ -188,11 +245,17 @@ class FirestoreService {
                 updatedAt: Date.now()
             };
             
-            const docRef = this.#getQuestionDocument(questionId);
+            const docRef = this.#getQuestionDocument(questionId, questionData);
             await docRef.update(updatedData);
             
             // Get the updated document
-            return this.getQuestionById(questionId);
+            const options = {};
+            if (questionData.institute && questionData.origin && questionData.origin.test_id) {
+                options.institute = questionData.institute;
+                options.test_id = questionData.origin.test_id;
+            }
+            
+            return this.getQuestionById(questionId, options);
         } catch (error) {
             console.error('Error updating question:', error);
             throw error;
@@ -202,11 +265,12 @@ class FirestoreService {
     /**
      * Deletes a question by ID
      * @param {string} questionId - The ID of the question to delete
+     * @param {Object} questionData - Optional question data to determine location
      * @returns {Promise<boolean>} - True if deletion was successful
      */
-    async deleteQuestion(questionId) {
+    async deleteQuestion(questionId, questionData = null) {
         try {
-            const docRef = this.#getQuestionDocument(questionId);
+            const docRef = this.#getQuestionDocument(questionId, questionData);
             await docRef.delete();
             return true;
         } catch (error) {
@@ -365,7 +429,6 @@ class FirestoreService {
                 are_questions_public: testData.are_questions_public !== undefined ? testData.are_questions_public : false,
                 institute: institute,
                 registered_count: testData.registered_count || 0,
-                questions_collection_name: `${institute}_test_questions`,
                 test_pattern: testData.test_pattern || 'none'
             };
             
@@ -373,9 +436,12 @@ class FirestoreService {
             const docRef = await db.collection('tests').add(documentData);
             const testId = docRef.id;
             
-            // Add bucket path to the test document
+            // Add bucket path and questions collection path to the test document
             const bucketPath = `test_questions_attachments/${institute}/${testId}`;
-            await docRef.update({ bucket_path: bucketPath });
+            await docRef.update({ 
+                bucket_path: bucketPath,
+                questions_collection_name: `institutes/${institute}/test_questions/${testId}/questions`
+            });
             
             // Get the updated document
             const updatedDoc = await docRef.get();
