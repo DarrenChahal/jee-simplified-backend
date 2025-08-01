@@ -9,6 +9,16 @@ steps:
         echo "Fetching secret..."
         gcloud secrets versions access latest --secret=${_SVC_ACCOUNT_JSON} > config.json
 
+  # Fetch the .env secret
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'access-env'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Fetching .env file..."
+        gcloud secrets versions access latest --secret=${_ENV_SECRET_NAME} > .env
+
   # Activate service account
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'use-service-account'
@@ -41,12 +51,13 @@ steps:
     args: ['run', 'services', 'update-traffic', '${_SERVICE_NAME_PUBSUB}', '--to-latest', '--region', 'us-central1']
 
 substitutions:
-  _PROJECT_ID: 'ivory-sentry-453910-q6'
+  _PROJECT_ID: 'jeesimplified'
   _IMAGE_NAME: 'jee-simplified-backend'
   _AUTO_TAG: '1.0.0'
   _DOCKERFILE: 'prod.Dockerfile'
   _SERVICE_NAME: 'jee-simplified-api'
   _SERVICE_NAME_PUBSUB: 'jee-simplified-pubsub'
   _SVC_ACCOUNT_JSON: 'jee-simplified-1'
+  _ENV_SECRET_NAME: 'env-file'
 
-# Run: gcloud builds submit --config=cloudbuild.yaml
+# Run: gcloud builds submit --config=builds/prod.cloudbuild.yaml
