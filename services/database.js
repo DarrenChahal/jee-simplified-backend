@@ -1,4 +1,4 @@
-import firestore from './firestore.js';
+import mongoService from './mongo.js';
 
 class DatabaseService {
     /**
@@ -7,7 +7,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The created question document
      */
     async createQuestion(questionData) {
-        return firestore.createQuestion(questionData);
+        return mongoService.createQuestion(questionData);
     }
     
     /**
@@ -16,7 +16,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The question document
      */
     async getQuestionById(questionId) {
-        return firestore.getQuestionById(questionId);
+        return mongoService.getQuestionById(questionId);
     }
     
     /**
@@ -25,7 +25,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The list of question documents
      */
     async listQuestions(filters = {}) {
-        return firestore.listQuestions(filters);
+        return mongoService.listQuestions(filters);
     }
     
     /**
@@ -35,7 +35,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The updated question document
      */
     async updateQuestion(questionId, questionData) {
-        return firestore.updateQuestion(questionId, questionData);
+        return mongoService.updateQuestion(questionId, questionData);
     }
     
     /**
@@ -44,28 +44,28 @@ class DatabaseService {
      * @returns {Promise<boolean>} - True if deletion was successful
      */
     async deleteQuestion(questionId) {
-        return firestore.deleteQuestion(questionId);
+        return mongoService.deleteQuestion(questionId);
     }
     
     // Answer-related methods
     async createAnswer(answerData) {
-        return firestore.createAnswer(answerData);
+        return mongoService.createAnswer(answerData);
     }
 
     async getAnswerById(id) {
-        return firestore.getAnswerById(id);
+        return mongoService.getAnswerById(id);
     }
 
     async listAnswers(filters = {}) {
-        return firestore.listAnswers(filters);
+        return mongoService.listAnswers(filters);
     }
 
     async updateAnswer(id, answerData) {
-        return firestore.updateAnswer(id, answerData);
+        return mongoService.updateAnswer(id, answerData);
     }
 
     async deleteAnswer(id) {
-        return firestore.deleteAnswer(id);
+        return mongoService.deleteAnswer(id);
     }
     
     // Template-related methods
@@ -75,7 +75,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The created template document
      */
     async createTemplate(templateData) {
-        return firestore.createTemplate(templateData);
+        return mongoService.createTemplate(templateData);
     }
     
     /**
@@ -84,7 +84,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The template document
      */
     async getTemplateById(templateId) {
-        return firestore.getTemplateById(templateId);
+        return mongoService.getTemplateById(templateId);
     }
     
     /**
@@ -93,7 +93,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The list of template documents
      */
     async listTemplates(filters = {}) {
-        return firestore.listTemplates(filters);
+        return mongoService.listTemplates(filters);
     }
     
     /**
@@ -103,7 +103,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The updated template document
      */
     async updateTemplate(templateId, templateData) {
-        return firestore.updateTemplate(templateId, templateData);
+        return mongoService.updateTemplate(templateId, templateData);
     }
     
     /**
@@ -112,7 +112,7 @@ class DatabaseService {
      * @returns {Promise<boolean>} - True if deletion was successful
      */
     async deleteTemplate(templateId) {
-        return firestore.deleteTemplate(templateId);
+        return mongoService.deleteTemplate(templateId);
     }
     
     // Test-related methods
@@ -122,7 +122,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The created test document
      */
     async createTest(testData) {
-        return firestore.createTest(testData);
+        return mongoService.createTest(testData);
     }
     
     /**
@@ -131,7 +131,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The test document
      */
     async getTestById(testId) {
-        return firestore.getTestById(testId);
+        return mongoService.getTestById(testId);
     }
     
     /**
@@ -140,7 +140,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The list of test documents
      */
     async listTests(filters = {}) {
-        return firestore.listTests(filters);
+        return mongoService.listTests(filters);
     }
     
     /**
@@ -150,7 +150,7 @@ class DatabaseService {
      * @returns {Promise<Object>} - The updated test document
      */
     async updateTest(testId, testData) {
-        return firestore.updateTest(testId, testData);
+        return mongoService.updateTest(testId, testData);
     }
     
     /**
@@ -159,7 +159,7 @@ class DatabaseService {
      * @returns {Promise<boolean>} - True if deletion was successful
      */
     async deleteTest(testId) {
-        return firestore.deleteTest(testId);
+        return mongoService.deleteTest(testId);
     }
 }
 
