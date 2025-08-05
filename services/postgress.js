@@ -1,4 +1,3 @@
-// postgres.js
 
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
@@ -19,15 +18,14 @@ pool.on('error', (err) => {
 
 
 class SQLService {
-  async registerUser(data) {
+  async registerForTest(data) {
     const {
       user_id,
       test_id,
       test_duration,
       test_date,
       status,
-      total_questions,
-      questions_solved,
+      total_questions
     } = data;
 
     const created_at = Date.now();
@@ -41,10 +39,9 @@ class SQLService {
         test_date,
         status,
         total_questions,
-        questions_solved,
         created_at,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *;
     `;
 
@@ -55,7 +52,6 @@ class SQLService {
       test_date,
       status,
       total_questions,
-      questions_solved,
       created_at,
       updated_at,
     ];

@@ -1,4 +1,4 @@
-import { validateRegistration } from '../utils/validation.js';
+import { validateRegistration } from '../validators/userValidator.js';
 import database from '../services/database.js';
 
 export const userController = {

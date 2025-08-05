@@ -163,8 +163,8 @@ class DatabaseService {
         return mongoService.deleteTest(testId);
     }
 
-    async registerUser(data) {
-        return sqlService.registerUser(data);
+    async registerForTest(data) {
+        return sqlService.registerForTest(data);
     }
 }
 
