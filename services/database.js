@@ -1,4 +1,5 @@
 import mongoService from './mongo.js';
+import {sqlService} from './postgress.js';
 
 class DatabaseService {
     /**
@@ -160,6 +161,10 @@ class DatabaseService {
      */
     async deleteTest(testId) {
         return mongoService.deleteTest(testId);
+    }
+
+    async registerUser(data) {
+        return sqlService.registerUser(data);
     }
 }
 

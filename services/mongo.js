@@ -156,7 +156,6 @@ class MongoService {
                 }
             }
         );
-
         return this.getTestById(testId);
     }
 
@@ -178,13 +177,21 @@ class MongoService {
     }
 
     async updateTest(testId, testData) {
+        const { _id, ...cleanData } = testData;
+
         const updatedData = {
-            ...testData,
+            ...cleanData,
             updated_at: Date.now()
         };
-        await this.#tests().updateOne({ _id: new ObjectId(testId) }, { $set: updatedData });
+
+        await this.#tests().updateOne(
+            { _id: new ObjectId(testId) },
+            { $set: updatedData }
+        );
+
         return this.getTestById(testId);
     }
+
 
     async deleteTest(testId) {
         await this.#tests().deleteOne({ _id: new ObjectId(testId) });
