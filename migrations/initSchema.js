@@ -1,10 +1,15 @@
 
 import fs from 'fs';
 import path from 'path';
-import pool from '../services/postgress';
+import pool from '../services/postgress.js';
+
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const schemaDir = path.join(__dirname, 'schema');
 
 const initSchema = async () => {
-  const schemaDir = './schema';
   const files = fs.readdirSync(schemaDir)
     .filter(f => f.endsWith('.sql'))
     .sort(); // ensures correct order like 001_*, 002_*
