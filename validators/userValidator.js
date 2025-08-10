@@ -3,22 +3,11 @@ import { z } from 'zod';
 const STATUS_VALUES = ['live', 'scheduled', 'complete'];
 
 const registrationSchema = z.object({
-  user_id: z.string().uuid({ message: 'user_id must be a valid UUID' }),
+  user_email: z.string().email({ message: 'user_id must be a valid email id' }),
   test_id: z.string().regex(/^[a-f\d]{24}$/i, {
     message: 'test_id must be a valid 24-character MongoDB ObjectId',
   }),
 
-  test_duration: z.number().int().positive('test_duration must be a positive integer'),
-
-  test_date: z.number().int().min(1000000000000, 'test_date must be a 13-digit Unix timestamp in ms'),
-
-  status: z.enum(STATUS_VALUES, {
-    errorMap: () => ({
-      message: `Status must be one of: ${STATUS_VALUES.join(', ')}`,
-    }),
-  }),
-
-  total_questions: z.number().int().nonnegative('total_questions must be 0 or a positive integer'),
 });
 
 export function validateRegistration(registrationData) {

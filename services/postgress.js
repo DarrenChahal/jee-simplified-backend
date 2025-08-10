@@ -20,7 +20,7 @@ pool.on('error', (err) => {
 class SQLService {
   async registerForTest(data) {
     const {
-      user_id,
+      user_email,
       test_id,
       test_duration,
       test_date,
@@ -33,7 +33,7 @@ class SQLService {
 
     const query = `
       INSERT INTO registration_tracking (
-        user_id,
+        user_email,
         test_id,
         test_duration,
         test_date,
@@ -46,7 +46,7 @@ class SQLService {
     `;
 
     const values = [
-      user_id,
+      user_email,
       test_id,
       test_duration,
       test_date,
@@ -61,6 +61,27 @@ class SQLService {
       return result.rows[0];
     } catch (err) {
       console.error('Error in registerUser:', err);
+      throw err;
+    }
+  }
+
+  async createUserFromClerk(userData) {
+    const { clerk_user_id, user_email, user_name } = userData;
+
+    const query = `
+      INSERT INTO app_users (clerk_user_id, user_email, user_name)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (clerk_user_id) DO NOTHING
+      RETURNING *;
+    `;
+
+    const values = [clerk_user_id, user_email, user_name];
+
+    try {
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (err) {
+      console.error('Error creating user from Clerk:', err);
       throw err;
     }
   }

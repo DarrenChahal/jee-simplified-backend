@@ -166,6 +166,10 @@ class DatabaseService {
     async registerForTest(data) {
         return sqlService.registerForTest(data);
     }
+
+    async createUserFromClerk(userData) {
+        return sqlService.createUserFromClerk(userData);
+    }
 }
 
 const database = new DatabaseService();

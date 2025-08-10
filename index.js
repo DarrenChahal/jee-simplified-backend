@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import apiRoutes from './routes/index.js';
+import clerkRoutes from './routes/clerk/index.js';
 import initSchema from './migrations/initSchema.js';
 
 const app = express();
@@ -8,6 +9,9 @@ const app = express();
 app.use(cors());
 
 const PORT = process.env.PORT || 8080;
+// Clerk webhook FIRST (raw body)
+app.use('/api/clerk', clerkRoutes);
+
 app.use(express.json());
 
 await initSchema(); // Initialize database schema
