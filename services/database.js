@@ -47,6 +47,14 @@ class DatabaseService {
     async deleteQuestion(questionId) {
         return mongoService.deleteQuestion(questionId);
     }
+
+    async addTestRegistration(testId){
+        return mongoService.addTestRegistration(testId);
+    }
+
+    async removeTestRegistration(testId){
+        return mongoService.removeTestRegistration(testId);
+    }
     
     // Answer-related methods
     async createAnswer(answerData) {
@@ -167,8 +175,16 @@ class DatabaseService {
         return sqlService.registerForTest(data);
     }
 
+    async unregisterForTest(data){
+        return sqlService.unregisterForTest(data);
+    }
+
     async createUserFromClerk(userData) {
         return sqlService.createUserFromClerk(userData);
+    }
+
+    async getRegisteredTests(email) {
+        return sqlService.getRegisteredTests(email);
     }
 }
 

@@ -41,3 +41,17 @@ export function validateRegistration(registrationData) {
     };
   }
 }
+
+export function validateEmail(email) {
+  const emailSchema = z.string().email({ message: 'Invalid email format' });
+  const result = emailSchema.safeParse(email);
+
+  if (result.success) {
+    return { isValid: true, errors: [] };
+  } else {
+    return {
+      isValid: false,
+      errors: result.error.errors.map(err => err.message)
+    };
+  }
+}

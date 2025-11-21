@@ -51,7 +51,7 @@ steps:
     args: ['run', 'services', 'update-traffic', '${_SERVICE_NAME_PUBSUB}', '--to-latest', '--region', 'us-central1']
 
 substitutions:
-  _PROJECT_ID: 'jeesimplified'
+  _PROJECT_ID: 'jeesimplified-476009'
   _IMAGE_NAME: 'jee-simplified-backend'
   _AUTO_TAG: '1.0.0'
   _DOCKERFILE: 'prod.Dockerfile'

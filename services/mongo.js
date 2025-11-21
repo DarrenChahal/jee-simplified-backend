@@ -197,6 +197,22 @@ class MongoService {
         await this.#tests().deleteOne({ _id: new ObjectId(testId) });
         return true;
     }
+
+    async addTestRegistration(testId) {
+        await this.#tests().updateOne(
+            { _id: new ObjectId(testId) },
+            { $inc: { registered_count: 1 } }
+        );
+        return true;
+    }
+
+    async removeTestRegistration(testId) {
+        await this.#tests().updateOne(
+            { _id: new ObjectId(testId) },
+            { $inc: { registered_count: -1 } }
+        );
+        return true;
+    }
 }
 
 const mongoService = new MongoService();
