@@ -59,13 +59,21 @@ class MongoService {
 
     async listQuestions(filters = {}) {
         const query = {};
+
+        // normal field filters
         ['subject', 'for_class', 'topic', 'difficulty', 'origin'].forEach(key => {
             if (filters[key]) query[key] = filters[key];
         });
 
+        // match inner field origin.test_id
+        if (filters.test_id) {
+            query["origin.test_id"] = filters.test_id;
+        }
+
         const documents = await this.#questions().find(query).toArray();
         return { documents };
     }
+
 
     async updateQuestion(questionId, questionData) {
         const updatedData = {
