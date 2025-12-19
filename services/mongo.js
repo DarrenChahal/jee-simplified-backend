@@ -28,6 +28,11 @@ class MongoService {
         return db.collection('system_counters');
     }
 
+    #answers() {
+        return db.collection('answers');
+    }
+
+
     async #getNextQuestionNumber() {
         const result = await this.#systemCounters().findOneAndUpdate(
             { _id: 'lastQuestionNumber' },
@@ -221,6 +226,54 @@ class MongoService {
         );
         return true;
     }
+
+    async createOrUpdateAnswer(answerData) {
+        const answers = this.#answers();
+        const { _id, ...dataWithoutId } = answerData;
+
+        // Determine the query filter
+        let filter;
+        if (_id) {
+            filter = { _id: _id }; // Deterministic String ID
+        } else {
+            // Fallback to composite key if no _id provided
+            const { user_id, question_id, solved_during_test } = answerData;
+            const test_id = solved_during_test?.test_id || null;
+            filter = {
+                user_id,
+                question_id,
+                "solved_during_test.test_id": test_id
+            };
+        }
+
+        // Handle specific fields (like preserving created_at on update)
+        const updatePayload = {
+            $set: {
+                ...dataWithoutId,
+                updatedAt: Date.now()
+            },
+            $setOnInsert: {
+                createdAt: Date.now()
+            }
+        };
+
+        // If _id is provided, ensure it's set on insert (though filter handles it usually)
+        // If we rely on upsert with filter {_id: ...}, mongo sets it automatically.
+
+        const result = await answers.findOneAndUpdate(
+            filter,
+            updatePayload,
+            { upsert: true, returnDocument: 'after' }
+        );
+
+        return result.value || result; // .value for older drivers, result for newer
+    }
+
+    async updateAnswer(id, answerData) {
+        // Delegate to createOrUpdateAnswer ensuring _id is included
+        return this.createOrUpdateAnswer({ ...answerData, _id: id });
+    }
+
 }
 
 const mongoService = new MongoService();
