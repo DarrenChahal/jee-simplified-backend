@@ -186,6 +186,14 @@ class DatabaseService {
     async getRegisteredTests(email) {
         return sqlService.getRegisteredTests(email);
     }
+
+    async submitTest(data) {
+        return sqlService.submitTest(data);
+    }
+
+    async getSubmittedTests(data) {
+        return sqlService.getSubmittedTests(data);
+    }
 }
 
 const database = new DatabaseService();

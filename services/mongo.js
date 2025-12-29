@@ -274,6 +274,32 @@ class MongoService {
         return this.createOrUpdateAnswer({ ...answerData, _id: id });
     }
 
+    async getAnswerById(id) {
+        const answer = await this.#answers().findOne({ _id: new ObjectId(id) });
+        if (!answer) throw new Error('Answer not found');
+        return answer;
+    }
+
+    async listAnswers(filters = {}) {
+        const query = {};
+
+        if (filters.user_id) query.user_id = filters.user_id;
+        if (filters.question_id) query.question_id = filters.question_id;
+
+        if (filters.test_id) {
+            query["solved_during_test.test_id"] = filters.test_id;
+        }
+
+        const documents = await this.#answers().find(query).toArray();
+        return { documents };
+    }
+
+    async deleteAnswer(id) {
+        await this.#answers().deleteOne({ _id: new ObjectId(id) });
+        return true;
+    }
+
+
 }
 
 const mongoService = new MongoService();
