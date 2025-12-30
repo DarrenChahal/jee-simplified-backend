@@ -131,6 +131,24 @@ class SQLService {
       throw err;
     }
   }
+
+  async getUsersForTest(test_id) {
+    const query = `
+      SELECT rt.user_email, rt.test_id, u.clerk_user_id
+      FROM registration_tracking rt
+      LEFT JOIN app_users u ON rt.user_email = u.user_email
+      WHERE rt.test_id = $1;
+    `;
+    const values = [test_id];
+
+    try {
+      const result = await pool.query(query, values);
+      return result.rows;
+    } catch (err) {
+      console.error('Error in getUsersForTest:', err);
+      throw err;
+    }
+  }
 }
 
 // Export both pool and service

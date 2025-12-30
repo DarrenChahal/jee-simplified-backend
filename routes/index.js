@@ -4,6 +4,7 @@ import answerRoutes from './answers/index.js';
 import templateRoutes from './templates/index.js';
 import testRoutes from './tests/index.js';
 import userRoutes from './users/index.js';
+import cronRoutes from './cron/index.js';
 const router = express.Router();
 
 // Register route modules
@@ -12,6 +13,7 @@ router.use('/answers', answerRoutes);
 router.use('/templates', templateRoutes);
 router.use('/tests', testRoutes);
 router.use('/users', userRoutes); 
+router.use('/cron', cronRoutes); 
 
 // Add more route modules here as the application grows
 // Example: router.use('/users', userRoutes);

@@ -198,6 +198,35 @@ class MongoService {
         return true;
     }
 
+    #answers() {
+        return db.collection('answers');
+    }
+
+    async listAnswers(filters = {}) {
+        const query = {};
+        if (filters.question_id) query.question_id = filters.question_id;
+        if (filters.user_id) query.user_id = filters.user_id;
+        if (filters.test_id) query['solved_during_test.test_id'] = filters.test_id;
+        if (filters.verdict) query.verdict = filters.verdict;
+        
+        // Special filter for missing verdict
+        if (filters.verdict === null) {
+            query.verdict = { $exists: false };
+        }
+
+        const documents = await this.#answers().find(query).toArray();
+        return { documents };
+    }
+
+    async updateAnswer(answerId, answerData) {
+        const updatedData = {
+            ...answerData,
+            updated_at: Date.now()
+        };
+        await this.#answers().updateOne({ _id: new ObjectId(answerId) }, { $set: updatedData });
+        return this.#answers().findOne({ _id: new ObjectId(answerId) });
+    }
+
     async addTestRegistration(testId) {
         await this.#tests().updateOne(
             { _id: new ObjectId(testId) },
