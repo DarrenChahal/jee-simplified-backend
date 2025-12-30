@@ -28,6 +28,11 @@ class MongoService {
         return db.collection('system_counters');
     }
 
+    #answers() {
+        return db.collection('answers');
+    }
+
+
     async #getNextQuestionNumber() {
         const result = await this.#systemCounters().findOneAndUpdate(
             { _id: 'lastQuestionNumber' },
@@ -59,13 +64,21 @@ class MongoService {
 
     async listQuestions(filters = {}) {
         const query = {};
+
+        // normal field filters
         ['subject', 'for_class', 'topic', 'difficulty', 'origin'].forEach(key => {
             if (filters[key]) query[key] = filters[key];
         });
 
+        // match inner field origin.test_id
+        if (filters.test_id) {
+            query["origin.test_id"] = filters.test_id;
+        }
+
         const documents = await this.#questions().find(query).toArray();
         return { documents };
     }
+
 
     async updateQuestion(questionId, questionData) {
         const updatedData = {
@@ -197,6 +210,96 @@ class MongoService {
         await this.#tests().deleteOne({ _id: new ObjectId(testId) });
         return true;
     }
+
+    async addTestRegistration(testId) {
+        await this.#tests().updateOne(
+            { _id: new ObjectId(testId) },
+            { $inc: { registered_count: 1 } }
+        );
+        return true;
+    }
+
+    async removeTestRegistration(testId) {
+        await this.#tests().updateOne(
+            { _id: new ObjectId(testId) },
+            { $inc: { registered_count: -1 } }
+        );
+        return true;
+    }
+
+    async createOrUpdateAnswer(answerData) {
+        const answers = this.#answers();
+        const { _id, ...dataWithoutId } = answerData;
+
+        // Determine the query filter
+        let filter;
+        if (_id) {
+            filter = { _id: _id }; // Deterministic String ID
+        } else {
+            // Fallback to composite key if no _id provided
+            const { user_id, question_id, solved_during_test } = answerData;
+            const test_id = solved_during_test?.test_id || null;
+            filter = {
+                user_id,
+                question_id,
+                "solved_during_test.test_id": test_id
+            };
+        }
+
+        // Handle specific fields (like preserving created_at on update)
+        const updatePayload = {
+            $set: {
+                ...dataWithoutId,
+                updatedAt: Date.now()
+            },
+            $setOnInsert: {
+                createdAt: Date.now()
+            }
+        };
+
+        // If _id is provided, ensure it's set on insert (though filter handles it usually)
+        // If we rely on upsert with filter {_id: ...}, mongo sets it automatically.
+
+        const result = await answers.findOneAndUpdate(
+            filter,
+            updatePayload,
+            { upsert: true, returnDocument: 'after' }
+        );
+
+        return result.value || result; // .value for older drivers, result for newer
+    }
+
+    async updateAnswer(id, answerData) {
+        // Delegate to createOrUpdateAnswer ensuring _id is included
+        return this.createOrUpdateAnswer({ ...answerData, _id: id });
+    }
+
+    async getAnswerById(id) {
+        const answer = await this.#answers().findOne({ _id: new ObjectId(id) });
+        if (!answer) throw new Error('Answer not found');
+        return answer;
+    }
+
+    async listAnswers(filters = {}) {
+        const query = {};
+
+        if (filters.user_id) query.user_id = filters.user_id;
+        if (filters.question_id) query.question_id = filters.question_id;
+
+        if (filters.test_id) {
+            query["solved_during_test.test_id"] = filters.test_id;
+        }
+
+        const documents = await this.#answers().find(query).toArray();
+        return { documents };
+    }
+
+    async deleteAnswer(id) {
+        await this.#answers().deleteOne({ _id: new ObjectId(id) });
+        return true;
+    }
+
+
 }
 
 const mongoService = new MongoService();

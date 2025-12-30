@@ -8,14 +8,14 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm i
 
 # Copy the rest of the application
 COPY . .
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV GCLOUD_PROJECT_ID=jeesimplified
+ENV GCLOUD_PROJECT_ID=jeesimplified-476009
 ARG GOOGLE_APPLICATION_CREDENTIALS
 ENV GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS
 
