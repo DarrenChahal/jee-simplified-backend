@@ -86,8 +86,8 @@ export const questionController = {
      */
     listQuestions: async (req, res) => {
         try {
-            // Extract filter parameters from query
-            const { subject, for_class, topic, difficulty, origin } = req.query;
+            
+            const { subject, for_class, topic, difficulty, origin, test_id } = req.query;
             
             // Build filters object
             const filters = {};
@@ -96,8 +96,8 @@ export const questionController = {
             if (topic) filters.topic = topic;
             if (difficulty) filters.difficulty = difficulty;
             if (origin) filters.origin = origin;
+            if (test_id) filters.test_id = test_id;
             
-            // Get questions with filters
             const questions = await database.listQuestions(filters);
             
             return res.status(200).json({

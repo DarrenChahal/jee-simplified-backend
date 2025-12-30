@@ -58,7 +58,7 @@ class DatabaseService {
     
     // Answer-related methods
     async createAnswer(answerData) {
-        return mongoService.createAnswer(answerData);
+        return mongoService.createOrUpdateAnswer(answerData);
     }
 
     async getAnswerById(id) {
@@ -185,6 +185,14 @@ class DatabaseService {
 
     async getRegisteredTests(email) {
         return sqlService.getRegisteredTests(email);
+    }
+
+    async submitTest(data) {
+        return sqlService.submitTest(data);
+    }
+
+    async getSubmittedTests(data) {
+        return sqlService.getSubmittedTests(data);
     }
 }
 

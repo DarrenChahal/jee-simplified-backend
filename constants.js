@@ -14,8 +14,8 @@ export const ANSWER_TYPES = ['input', 'single_choice', 'multi_choice'];
 
 
 // Answer validation constants
-export const ANSWER_STATUS = ['skip', 'review', 'marked for review', 'accepted'];
-export const VERDICT_TYPES = ['correct', 'incorrect'];
+export const ANSWER_STATUS = ['skip', 'review', 'review-answered', 'answered'];
+export const VERDICT_TYPES = ['correct', 'incorrect', 'nothing'];
 export const TEST_TYPES = ['mock', 'prev_year'];
 export const INSTITUTES = ['jee-simplified'];
 export const TEST_STATUS = ['draft', 'scheduled', 'live', 'complete'];

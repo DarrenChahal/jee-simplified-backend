@@ -4,6 +4,7 @@ import answerRoutes from './answers/index.js';
 import templateRoutes from './templates/index.js';
 import testRoutes from './tests/index.js';
 import userRoutes from './users/index.js';
+import systemRoutes from './system/index.js';
 import cronRoutes from './cron/index.js';
 const router = express.Router();
 
@@ -12,6 +13,8 @@ router.use('/questions', questionRoutes);
 router.use('/answers', answerRoutes);
 router.use('/templates', templateRoutes);
 router.use('/tests', testRoutes);
+router.use('/users', userRoutes);
+router.use('/system', systemRoutes); 
 router.use('/users', userRoutes); 
 router.use('/cron', cronRoutes); 
 

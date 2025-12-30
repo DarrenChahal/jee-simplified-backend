@@ -132,20 +132,58 @@ class SQLService {
     }
   }
 
-  async getUsersForTest(test_id) {
+  async submitTest(data) {
+    const { user_email, test_id } = data;
+    const submitted_at = Date.now();
+    const updated_at = submitted_at;
+
     const query = `
-      SELECT rt.user_email, rt.test_id, u.clerk_user_id
-      FROM registration_tracking rt
-      LEFT JOIN app_users u ON rt.user_email = u.user_email
-      WHERE rt.test_id = $1;
+      UPDATE registration_tracking
+      SET submission_status = 'SUBMITTED',
+          submitted_at = $3,
+          updated_at = $4
+      WHERE user_email = $1 AND test_id = $2
+      RETURNING *;
     `;
-    const values = [test_id];
+
+    const values = [user_email, test_id, submitted_at, updated_at];
 
     try {
       const result = await pool.query(query, values);
-      return result.rows;
+
+      // If no row was updated, user is not registered for this test
+      if (result.rows.length === 0) {
+        throw new Error("User is not registered for this test.");
+      }
+
+      return result.rows[0];
     } catch (err) {
-      console.error('Error in getUsersForTest:', err);
+      console.error("Error in submitTest:", err);
+      throw err;
+    }
+  }
+
+  async getSubmittedTests(data) {
+    const { user_email, test_ids } = data;
+
+    // Create placeholders for the IN clause: $2, $3, $4, etc.
+    const placeholders = test_ids.map((_, index) => `$${index + 2}`).join(', ');
+
+    const query = `
+      SELECT test_id FROM registration_tracking
+      WHERE user_email = $1 
+        AND test_id IN (${placeholders})
+        AND submission_status = 'SUBMITTED';
+    `;
+
+    const values = [user_email, ...test_ids];
+
+    try {
+      const result = await pool.query(query, values);
+      // Extract just the test_ids from the result rows
+      return result.rows.map(row => row.test_id);
+    } catch (err) {
+      console.error("Error in getSubmittedTests:", err);
       throw err;
     }
   }

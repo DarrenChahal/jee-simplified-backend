@@ -1,4 +1,4 @@
-import { validateRegistration, validateEmail } from '../validators/userValidator.js';
+import { validateRegistration, validateEmail, validateTestSubmission, validateSubmittedTestsRequest } from '../validators/userValidator.js';
 import database from '../services/database.js';
 
 export const userController = {
@@ -96,6 +96,69 @@ export const userController = {
             return res.status(500).json({
                 success: false,
                 message: 'Failed to fetch registered tests',
+                error: error.message
+            });
+        }
+    },
+
+    async submitTest(req, res) {
+        try {
+            const submissionData = req.body;
+
+            // Validate submission data
+            const validation = validateTestSubmission(submissionData);
+            if (!validation.isValid) {
+                return res.status(400).json({
+                    success: false,
+                    errors: validation.errors
+                });
+            }
+            const validatedSubmissionData = validation.data;
+
+            // Update submission status in database
+            const result = await database.submitTest(validatedSubmissionData);
+
+            return res.status(200).json({
+                success: true,
+                message: 'Test submitted successfully',
+                data: result
+            });
+        } catch (error) {
+            console.error('Error in submitTest controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to submit test',
+                error: error.message
+            });
+        }
+    },
+
+    async getSubmittedTests(req, res) {
+        try {
+            const requestData = req.body;
+
+            // Validate request data
+            const validation = validateSubmittedTestsRequest(requestData);
+            if (!validation.isValid) {
+                return res.status(400).json({
+                    success: false,
+                    errors: validation.errors
+                });
+            }
+            const validatedRequestData = validation.data;
+
+            // Get submitted tests from database
+            const submittedTestIds = await database.getSubmittedTests(validatedRequestData);
+
+            return res.status(200).json({
+                success: true,
+                data: submittedTestIds
+            });
+        } catch (error) {
+            console.error('Error in getSubmittedTests controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to fetch submitted tests',
                 error: error.message
             });
         }

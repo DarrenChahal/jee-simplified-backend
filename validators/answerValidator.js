@@ -5,7 +5,7 @@ import { ANSWER_STATUS, VERDICT_TYPES, TEST_TYPES, ORIGIN_TYPES } from '../const
 const solvedDuringTestSchema = z.object({
   test_type: z.enum(TEST_TYPES),
   test_id: z.string().min(1, 'Test ID is required'),
-  duration_passed_when_solved: z.number().int().min(0),
+  duration_passed_when_solved: z.number().int().min(0).nullable(),
   marked_as: z.enum(ANSWER_STATUS)
 }).nullable();
 
@@ -18,21 +18,32 @@ const userAnswerSchema = z.object({
 
 // Main answer schema
 const baseAnswerSchema = z.object({
-  _id: z.string(),
   question_id: z.string().min(1, 'Question ID is required'),
+  _id: z.string().optional(), // Allow deterministic ID
   user_id: z.string().min(1, 'User ID is required'),
   solved_during_test: solvedDuringTestSchema,
   time_taken: z.number().int().min(0, 'Time taken must be a positive number'),
   answer: userAnswerSchema,
   verdict: z.enum(VERDICT_TYPES),
   analysis_sheet_id: z.string().optional(),
-  submittedAt: z.string().datetime('Submitted at must be a valid ISO datetime'),
+  submittedAt: z.number().int().nonnegative('submittedAt must be a valid Unix timestamp'),
   question_type: z.enum(['input', 'single-select', 'multi-select'])
 });
 
 // Add refinement to ensure answer matches question type
+// Add refinement to ensure answer matches question type
 const answerSchema = baseAnswerSchema.refine(
   (data) => {
+    // Check if question was skipped or marked for review (without answer)
+    const status = data.solved_during_test?.marked_as;
+    const isSkippedOrReview = status === 'skip' || status === 'review';
+
+    // If skipped or review (no answer), we allow empty answer object
+    if (isSkippedOrReview) {
+      return true;
+    }
+
+    // Otherwise (answered or review-answered), validate content
     // For input type questions
     if (data.question_type === 'input') {
       return typeof data.answer.input === 'string' && 
@@ -56,7 +67,11 @@ const answerSchema = baseAnswerSchema.refine(
     return false;
   },
   {
-    message: (data) => `Answer format does not match question type: ${data.question_type}`,
+    message: (data) => {
+        const status = data.solved_during_test?.marked_as;
+        if (status === 'skip' || status === 'review') return "Invalid skip/review state";
+        return `Answer format does not match question type: ${data.question_type}`;
+    },
     path: ['answer']
   }
 );

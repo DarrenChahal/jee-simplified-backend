@@ -1,5 +1,7 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+
 import apiRoutes from './routes/index.js';
 import clerkRoutes from './routes/clerk/index.js';
 import initSchema from './migrations/initSchema.js';
