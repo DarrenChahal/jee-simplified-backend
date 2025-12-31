@@ -1,9 +1,15 @@
 // MongoDB-based implementation of FirestoreService
 import dotenv from 'dotenv';
 import { MongoClient, ObjectId } from 'mongodb';
+import { LRUCache } from 'lru-cache';
 
 // Load environment variables
 dotenv.config();
+
+const dashboardCache = new LRUCache({
+    max: 500,
+    ttl: 1000 * 60 * 5, // 5 minutes
+});
 
 // MongoDB Initialization
 const client = new MongoClient(process.env.MONGODB_URI);
@@ -294,12 +300,178 @@ class MongoService {
         return { documents };
     }
 
+
     async deleteAnswer(id) {
         await this.#answers().deleteOne({ _id: new ObjectId(id) });
         return true;
     }
 
+    // Dashboard Statistics Aggregations
+    async getUserAnswerStats(userIds) {
+        // userIds allows query by multiple IDs (e.g. email and clerk_id) if needed.
+        // For now we expect a single userId commonly, or list.
+        // We will cache by the first ID in the list as primary key or join them.
+        const cacheKey = `stats:${userIds.join('|')}`;
+        const cached = dashboardCache.get(cacheKey);
+        if (cached) return cached;
 
+        const matchStage = { $match: { user_id: { $in: userIds } } };
+
+        // 1. Overall Stats
+        const overallStatsPipeline = [
+            matchStage,
+            {
+                $group: {
+                    _id: null,
+                    totalQuestions: { $sum: 1 },
+                    correctAnswers: { $sum: { $cond: [{ $eq: ['$verdict', 'correct'] }, 1, 0] } },
+                    incorrectAnswers: { $sum: { $cond: [{ $eq: ['$verdict', 'incorrect'] }, 1, 0] } },
+                    timeSpent: { $sum: '$time_taken' } // ms
+                }
+            }
+        ];
+
+        // 2. Subject Stats
+        // Note: questions.subject is an ARRAY, need to unwind
+        // Also need to handle duplicate answers for same question (best verdict wins)
+        
+        // First, get total questions per subject
+        const totalQuestionsPerSubject = await this.#questions().aggregate([
+            { $unwind: '$subjects' },
+            { $group: { _id: '$subjects', total: { $sum: 1 } } }
+        ]).toArray();
+
+        // Second, get user's performance per subject
+        const userSubjectStatsPipeline = [
+            matchStage,
+            // Group by question_id to determine best verdict
+            { $group: {
+                _id: '$question_id',
+                hasCorrect: { $max: { $cond: [{ $eq: ['$verdict', 'correct'] }, 1, 0] } },
+                hasIncorrect: { $max: { $cond: [{ $eq: ['$verdict', 'incorrect'] }, 1, 0] } }
+            }},
+            // Determine status: correct if any correct, else incorrect if any incorrect, else attempted
+            { $addFields: {
+                status: {
+                    $cond: [
+                        { $eq: ['$hasCorrect', 1] }, 'correct',
+                        { $cond: [
+                            { $eq: ['$hasIncorrect', 1] }, 'incorrect',
+                            'attempted'
+                        ]}
+                    ]
+                }
+            }},
+            // Lookup question to get subject
+            { $lookup: {
+                from: 'questions',
+                let: { qId: '$_id' },
+                pipeline: [
+                    { $match: { $expr: { $eq: [{ $toString: '$_id' }, '$$qId'] } } }
+                ],
+                as: 'question'
+            }},
+            { $unwind: { path: '$question', preserveNullAndEmptyArrays: false } },
+            // Unwind subjects array (since subjects is an array in questions)
+            { $unwind: { path: '$question.subjects', preserveNullAndEmptyArrays: false } },
+            // Group by subject
+            { $group: {
+                _id: '$question.subjects',
+                solved: { $sum: 1 },
+                correct: { $sum: { $cond: [{ $eq: ['$status', 'correct'] }, 1, 0] } },
+                incorrect: { $sum: { $cond: [{ $eq: ['$status', 'incorrect'] }, 1, 0] } }
+            }}
+        ];
+
+        // 3. Weak Topics
+        // Similar to subject stats but group by topic & subject
+        const weakTopicsPipeline = [
+            matchStage,
+            // Group by question_id first
+            { $group: {
+                _id: '$question_id',
+                hasCorrect: { $max: { $cond: [{ $eq: ['$verdict', 'correct'] }, 1, 0] } }
+            }},
+            // Lookup question
+            { $lookup: {
+                from: 'questions',
+                let: { qId: '$_id' },
+                pipeline: [
+                    { $match: { $expr: { $eq: [{ $toString: '$_id' }, '$$qId'] } } }
+                ],
+                as: 'question'
+            }},
+            { $unwind: { path: '$question', preserveNullAndEmptyArrays: false } },
+            // Unwind subjects array
+            { $unwind: { path: '$question.subjects', preserveNullAndEmptyArrays: false } },
+            // Unwind topics array
+            { $unwind: { path: '$question.topics', preserveNullAndEmptyArrays: false } },
+            // Group by subject and topic
+            { $group: {
+                _id: { subject: '$question.subjects', topic: '$question.topics' },
+                total: { $sum: 1 },
+                correct: { $sum: '$hasCorrect' }
+            }},
+            { $project: {
+                subject: '$_id.subject',
+                topic: '$_id.topic',
+                accuracy: { 
+                    $cond: [
+                        { $gt: ['$total', 0] },
+                        { $multiply: [{ $divide: ['$correct', '$total'] }, 100] },
+                        0
+                    ]
+                },
+                total: 1
+            }},
+            { $sort: { accuracy: 1 } },
+            { $limit: 5 }
+        ];
+        
+        // 4. Activity Streak (Latest dates)
+        const streakPipeline = [
+            matchStage,
+            { 
+                $project: { 
+                    date: { 
+                        $dateToString: { format: "%Y-%m-%d", date: { $toDate: "$createdAt" } } // using createdAt or submittedAt
+                    } 
+                } 
+            },
+            { $group: { _id: "$date" } },
+            { $sort: { _id: 1 } }
+        ];
+
+
+        const [overall, userSubjectStats, weakTopics, activity] = await Promise.all([
+            this.#answers().aggregate(overallStatsPipeline).toArray(),
+            this.#answers().aggregate(userSubjectStatsPipeline).toArray(),
+            this.#answers().aggregate(weakTopicsPipeline).toArray(),
+            this.#answers().aggregate(streakPipeline).toArray()
+        ]);
+
+        // Merge subject stats: combine total questions with user stats
+        const subjects = totalQuestionsPerSubject.map(total => {
+            const userStat = userSubjectStats.find(s => s._id === total._id) || {};
+            return {
+                _id: total._id,
+                totalQuestions: total.total,
+                solved: userStat.solved || 0,
+                correct: userStat.correct || 0,
+                incorrect: userStat.incorrect || 0
+            };
+        });
+
+        const result = {
+            overall: overall[0] || { totalQuestions: 0, correctAnswers: 0, incorrectAnswers: 0, timeSpent: 0 },
+            subjects,
+            weakTopics,
+            activity: activity.map(a => a._id)
+        };
+
+        dashboardCache.set(cacheKey, result);
+        return result;
+    }
 }
 
 const mongoService = new MongoService();

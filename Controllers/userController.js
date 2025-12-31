@@ -162,5 +162,38 @@ export const userController = {
                 error: error.message
             });
         }
+    },
+
+    async getUserDashboard(req, res) {
+        try {
+            const { identifier } = req.params;
+
+            if (!identifier) {
+                return res.status(400).json({
+                    success: false,
+                    message: "User identifier is required"
+                });
+            }
+
+            // We assume identifier is email for now. 
+            // If validation is needed we can reuse validateEmail or similar.
+            const dashboardData = await database.getUserDashboard(identifier);
+            //console.log("dashboardData", dashboardData);
+
+            return res.status(200).json(dashboardData);
+        } catch (error) {
+            console.error('Error in getUserDashboard controller:', error);
+            if (error.message === 'User not found') {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to fetch dashboard data',
+                error: error.message
+            });
+        }
     }
 }

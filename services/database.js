@@ -194,6 +194,160 @@ class DatabaseService {
     async getSubmittedTests(data) {
         return sqlService.getSubmittedTests(data);
     }
+
+    async getUserProfile(email) {
+        return sqlService.getUserProfile(email);
+    }
+
+    async getUserRatingHistory(email) {
+        return sqlService.getUserRatingHistory(email);
+    }
+
+    async getUserAnswerStats(userIds) {
+        return mongoService.getUserAnswerStats(userIds);
+    }
+
+    async getUserDashboard(email) {
+        // 1. Get User Profile from SQL (includes latest rating/rank)
+        const profile = await this.getUserProfile(email);
+        if (!profile) {
+            throw new Error('User not found');
+        }
+
+        // 2. Prepare User IDs for Mongo Aggregation
+        // We use both email and clerk_id (if available) to match answers
+        // assuming answers could be tagged by either.
+        // Based on answer schema, user_id is a string. It's likely the Clerk ID or Email.
+        // We will pass both just in case, or just the email if that's the convention.
+        // Checking schema: user_id is string.
+        // Let's pass [email, profile.clerk_user_id] filtering out nulls.
+        const userIds = [email];
+        // Note: We don't have clerk_user_id in the profile returned by getUserProfile SQL query yet, 
+        // need to make sure it's selected if we want to use it.
+        // The getUserProfile SQL selected: id, user_name, user_email, date_of_joining, class, institute.
+        // Let's assume for now answers are keyed by email or handled upstrem. 
+        // If answers are keyed by Clerk ID, we should select it in getUserProfile.
+
+        // 3. Parallel Fetch: Rating History & Answer Stats
+        const [ratingHistory, answerStats] = await Promise.all([
+            this.getUserRatingHistory(email),
+            this.getUserAnswerStats(userIds) 
+        ]);
+
+        // 4. Calculate Derived Metrics (Streak)
+        const activityDates = answerStats.activity; // ["2024-01-01", "2024-01-02"] sorted ASC
+        
+        let currentStreak = 0;
+        let longestStreak = 0;
+        
+        if (activityDates.length > 0) {
+            // --- Current Streak Calculation ---
+            const today = new Date().toISOString().split('T')[0];
+            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+            const lastActive = activityDates[activityDates.length - 1];
+            
+            if (lastActive === today || lastActive === yesterday) {
+                currentStreak = 1;
+                // Walk backwards for current streak
+                for (let i = activityDates.length - 1; i > 0; i--) {
+                    const curr = new Date(activityDates[i]);
+                    const prev = new Date(activityDates[i - 1]);
+                    const diffTime = Math.abs(curr - prev);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    
+                    if (diffDays === 1) {
+                        currentStreak++;
+                    } else if (diffDays === 0) {
+                        continue; // Same day
+                    } else {
+                        break; // Gap found
+                    }
+                }
+            }
+
+            // --- Longest Streak Calculation ---
+            let tempStreak = 1;
+            longestStreak = 1; // At least 1 if there is activity
+            
+            for (let i = 1; i < activityDates.length; i++) {
+                const curr = new Date(activityDates[i]);
+                const prev = new Date(activityDates[i - 1]);
+                const diffTime = Math.abs(curr - prev);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays === 1) {
+                    tempStreak++;
+                } else if (diffDays > 1) {
+                     // Gap found, reset
+                    longestStreak = Math.max(longestStreak, tempStreak);
+                    tempStreak = 1;
+                }
+                // if diffDays === 0 (same day), do nothing, keep streak count
+            }
+            longestStreak = Math.max(longestStreak, tempStreak);
+        }
+
+        // Avatar Initials
+        const getAvatarInitials = (name) => {
+             if (!name) return "";
+             return name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        };
+
+        return {
+            user: {
+                id: profile.id,
+                name: profile.name,
+                username: profile.email.split('@')[0],
+                avatarUrl: getAvatarInitials(profile.name),
+                joinedDate: new Date(parseInt(profile.date_of_joining)).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+                badges: [],
+                rank: profile.last_rank || 0,
+                rating: profile.current_rating || 0,
+                percentile: 0,
+                dayStreak: currentStreak
+            },
+            stats: {
+                totalQuestions: answerStats.overall.totalQuestions,
+                correctAnswers: answerStats.overall.correctAnswers,
+                accuracy: answerStats.overall.totalQuestions > 0 ? (answerStats.overall.correctAnswers / answerStats.overall.totalQuestions * 100) : 0,
+                incorrectAnswers: answerStats.overall.incorrectAnswers,
+                timeSpentMinutes: Math.round(answerStats.overall.timeSpent / 1000 / 60),
+                // Provide avg time in Minutes to match expectation
+                avgTimePerQuestion: answerStats.overall.totalQuestions > 0 ? (answerStats.overall.timeSpent / 1000 / 60 / answerStats.overall.totalQuestions) : 0,
+                currentRating: profile.current_rating || 0,
+                ratingChange: profile.last_change || 0,
+                testsCompleted: profile.tests_completed ? parseInt(profile.tests_completed) : 0,
+                fullMocks: 0,
+                airPercentile: 0,
+                percentileLabel: "Unranked",
+                // Avg Speed: Questions per Minute
+                avgSpeedPerQuestion: (answerStats.overall.timeSpent > 0 && answerStats.overall.totalQuestions > 0) 
+                    ? parseFloat((answerStats.overall.totalQuestions / (answerStats.overall.timeSpent / 1000 / 60)).toFixed(1))
+                    : 0
+            },
+            ratingHistory,
+            subjects: answerStats.subjects.map(s => ({
+                name: s._id,
+                totalQuestions: s.totalQuestions,
+                solved: s.solved,
+                correct: s.correct,
+                incorrect: s.incorrect,
+                accuracy: s.solved > 0 ? parseFloat(((s.correct / s.solved) * 100).toFixed(1)) : 0
+            })),
+            streak: {
+                current: currentStreak,
+                longest: longestStreak,
+                activity: activityDates.map(d => ({ day: new Date(d).toLocaleDateString('en-US', { weekday: 'short' }), active: true })).slice(-7)
+            },
+            weakTopics: answerStats.weakTopics.map(t => ({
+                subject: t.subject,
+                topic: t.topic,
+                accuracy: t.accuracy,
+                trend: 0
+            })),
+            achievements: []
+        };
+    }
 }
 
 const database = new DatabaseService();

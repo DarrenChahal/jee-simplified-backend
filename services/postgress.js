@@ -187,6 +187,76 @@ class SQLService {
       throw err;
     }
   }
+
+  async getUserProfile(email) {
+    const query = `
+      SELECT 
+        u.id, 
+        u.user_name as name, 
+        u.user_email as email,
+        u.date_of_joining,
+        u.class,
+        u.institute
+      FROM app_users u
+      WHERE u.user_email = $1;
+    `;
+    
+    // Get latest rating stats
+    const statsQuery = `
+      SELECT 
+        user_rating_post_test as current_rating,
+        user_test_ranking as last_rank,
+        user_rating_change as last_change,
+        (SELECT COUNT(*) FROM registration_tracking WHERE user_email = $1 AND submission_status = 'SUBMITTED') as tests_completed
+      FROM registration_tracking
+      WHERE user_email = $1 AND submission_status = 'SUBMITTED'
+      ORDER BY submitted_at DESC
+      LIMIT 1;
+    `;
+
+    try {
+      const [userRes, statsRes] = await Promise.all([
+        pool.query(query, [email]),
+        pool.query(statsQuery, [email])
+      ]);
+
+      if (userRes.rows.length === 0) return null;
+
+      const user = userRes.rows[0];
+      // If user has no submitted tests, statsRes.rows[0] will be undefined.
+      // In that case, we need to manually query the count or just set it to 0.
+      // However, the subquery for count is inside the main query which depends on WHERE matching a row.
+      // If the user has NEVER submitted a test, the main query returns 0 rows, so we won't get the count (which is 0).
+      // That is fine, stats will be empty object, we default tests_completed to 0.
+      const stats = statsRes.rows[0] || { tests_completed: 0 };
+
+      return { ...user, ...stats };
+    } catch (err) {
+      console.error('Error in getUserProfile:', err);
+      throw err;
+    }
+  }
+
+  async getUserRatingHistory(email) {
+    const query = `
+      SELECT 
+        submitted_at as date,
+        user_rating_post_test as rating
+      FROM registration_tracking
+      WHERE user_email = $1 AND submission_status = 'SUBMITTED'
+      ORDER BY submitted_at ASC;
+    `;
+    try {
+      const result = await pool.query(query, [email]);
+      return result.rows.map(row => ({
+        date: new Date(parseInt(row.date)).toLocaleString('default', { month: 'short' }),
+        rating: row.rating
+      }));
+    } catch (err) {
+      console.error('Error in getUserRatingHistory:', err);
+      throw err;
+    }
+  }
 }
 
 // Export both pool and service
