@@ -306,6 +306,20 @@ class MongoService {
         return true;
     }
 
+    async getEarliestTestAnswer(testId, userId) {
+        const query = {
+            "solved_during_test.test_id": testId,
+            user_id: userId
+        };
+
+        const result = await this.#answers().find(query, {
+            sort: { createdAt: 1 },
+            limit: 1
+        }).toArray();
+
+        return result[0] || null;
+    }
+
     // Dashboard Statistics Aggregations
     async getUserAnswerStats(userIds) {
         // userIds allows query by multiple IDs (e.g. email and clerk_id) if needed.
@@ -471,6 +485,39 @@ class MongoService {
 
         dashboardCache.set(cacheKey, result);
         return result;
+    }
+    async getTestResultsDetails(testIds, email) {
+        if (!testIds.length) return {};
+
+        // 1. Get Test Details
+        const tests = await this.#tests().find({ 
+            _id: { $in: testIds.map(id => new ObjectId(id)) } 
+        }).toArray();
+
+        // 2. Get Total Questions for each test
+        const questionsCounts = await this.#questions().aggregate([
+            { $match: { "origin.test_id": { $in: testIds } } },
+            { $group: { _id: "$origin.test_id", total: { $sum: 1 } } }
+        ]).toArray();
+        
+        const countsMap = {};
+        questionsCounts.forEach(c => {
+            countsMap[c._id] = c.total;
+        });
+
+        const resultMap = {};
+        tests.forEach(test => {
+            const tId = test._id.toString();
+            const totalQ = countsMap[tId] || 0;
+
+            resultMap[tId] = {
+                title: test.title,
+                totalQuestions: totalQ,
+                totalParticipants: test.registered_count || 0
+            };
+        });
+        
+        return resultMap;
     }
 }
 

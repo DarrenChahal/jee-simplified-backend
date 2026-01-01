@@ -1,5 +1,6 @@
 import mongoService from './mongo.js';
 import {sqlService} from './postgress.js';
+import adminCache from './adminCache.js';
 
 class DatabaseService {
     /**
@@ -188,7 +189,56 @@ class DatabaseService {
     }
 
     async submitTest(data) {
-        return sqlService.submitTest(data);
+        const { user_email, test_id } = data;
+        let user_test_duration = 0;
+
+        try {
+            // 1. Get Test Details for scheduled start time
+            // We use mongoService directly as it's imported
+            const test = await mongoService.getTestById(test_id);
+            
+            // Handle test_date format (detect if seconds or ms)
+            let testStartTime = 0;
+            if (test.test_date) {
+                testStartTime = Number(test.test_date);
+                // Heuristic: If timestamp is in seconds (e.g. 10 digits), convert to ms
+                if (testStartTime < 10000000000) {
+                    testStartTime *= 1000;
+                }
+            }
+
+            // 2. Get Earliest Answer
+            const earliestAnswer = await mongoService.getEarliestTestAnswer(test_id, user_email);
+
+            if (earliestAnswer) {
+                // Determine created_at field (handle potential naming variations)
+                const answerCreatedAt = earliestAnswer.createdAt || earliestAnswer.created_at || Date.now();
+                const timeTaken = earliestAnswer.time_taken || 0; // ms
+
+                let calculatedStartTime = answerCreatedAt - timeTaken;
+
+                // Safety check: ensure start time is not before test start time
+                // Only if test has a scheduled start time
+                if (testStartTime > 0 && calculatedStartTime < testStartTime) {
+                    calculatedStartTime = testStartTime;
+                }
+
+                // Calculate duration: Now - Calculated Start
+                user_test_duration = Date.now() - calculatedStartTime;
+
+                // Ensure non-negative
+                if (user_test_duration < 0) user_test_duration = 0;
+            }
+        } catch (err) {
+            console.error("Error calculating user_test_duration:", err);
+            // Proceed with submission even if calculation fails? 
+            // We'll log it and let duration be 0 or keep partial calculation.
+        }
+
+        return sqlService.submitTest({ 
+            ...data, 
+            user_test_duration 
+        });
     }
 
     async getSubmittedTests(data) {
@@ -347,6 +397,78 @@ class DatabaseService {
             })),
             achievements: []
         };
+    }
+
+    async getUserTestResults(email, page = 1, limit = 10) {
+        // 1. Get total count
+        const total = await sqlService.getUserTestHistoryCount(email);
+        const totalPages = Math.ceil(total / limit);
+        const offset = (page - 1) * limit;
+
+        // 2. Get Paginated History from SQL
+        const history = await sqlService.getUserTestHistory(email, limit, offset);
+        
+        if (history.length === 0) {
+            return {
+                total,
+                page,
+                limit,
+                totalPages,
+                results: []
+            };
+        }
+
+        // 3. Get Details from Mongo
+        const testIds = history.map(h => h.test_id);
+        const detailsMap = await mongoService.getTestResultsDetails(testIds, email);
+
+        // 4. Merge
+        const results = history.map(h => {
+             const details = detailsMap[h.test_id] || {};
+             
+             return {
+                 testId: h.test_id,
+                 title: details.title || "Unknown Test",
+                 submittedAt: parseInt(h.submitted_at),
+                 ratingAfterTest: h.user_rating_post_test || 0,
+                 ratingChange: h.user_rating_change || 0,
+                 timeTaken: h.user_test_duration || 0, 
+                 questionsSolved: h.questions_solved || 0,
+                 totalQuestions: details.totalQuestions || 0,
+                 rank: h.rank || 0,
+                 totalParticipants: details.totalParticipants || 0
+             };
+        });
+
+        return {
+            total,
+            page,
+            limit,
+            totalPages,
+            results
+        };
+    }
+
+    async checkAdminStatus(email) {
+        // Check cache first
+        const cacheKey = `admin:${email}`;
+        const cachedStatus = adminCache.get(cacheKey);
+        
+        if (cachedStatus !== undefined) {
+            console.log(`Admin status cache hit for: ${email}`);
+            return cachedStatus;
+        }
+        
+        // Cache miss - query database
+        console.log(`Admin status cache miss for: ${email}`);
+        const isAdmin = await sqlService.checkAdminStatus(email);
+        
+        // Store in cache (even if null/false)
+        if (isAdmin !== null) {
+            adminCache.set(cacheKey, isAdmin);
+        }
+        
+        return isAdmin;
     }
 }
 

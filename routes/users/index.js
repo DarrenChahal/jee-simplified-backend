@@ -15,6 +15,8 @@ router.post('/test-unregistration', userController.unregisterForTest);
 router.get('/registrations/:email', userController.getRegisteredTests);
 router.post('/test-submission', userController.submitTest);
 router.post('/submitted-tests', userController.getSubmittedTests);
+router.get('/test-results/:email', userController.getUserTestResults);
+router.get('/check-admin', userController.checkAdmin);
 router.get('/:identifier/dashboard', userController.getUserDashboard);
 
 

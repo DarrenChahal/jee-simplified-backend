@@ -133,7 +133,7 @@ class SQLService {
   }
 
   async submitTest(data) {
-    const { user_email, test_id } = data;
+    const { user_email, test_id, user_test_duration } = data;
     const submitted_at = Date.now();
     const updated_at = submitted_at;
 
@@ -141,12 +141,13 @@ class SQLService {
       UPDATE registration_tracking
       SET submission_status = 'SUBMITTED',
           submitted_at = $3,
-          updated_at = $4
+          updated_at = $4,
+          user_test_duration = $5
       WHERE user_email = $1 AND test_id = $2
       RETURNING *;
     `;
 
-    const values = [user_email, test_id, submitted_at, updated_at];
+    const values = [user_email, test_id, submitted_at, updated_at, user_test_duration];
 
     try {
       const result = await pool.query(query, values);
@@ -254,6 +255,67 @@ class SQLService {
       }));
     } catch (err) {
       console.error('Error in getUserRatingHistory:', err);
+      throw err;
+    }
+  }
+
+  async checkAdminStatus(email) {
+    const query = `
+      SELECT role
+      FROM app_users
+      WHERE user_email = $1;
+    `;
+    
+    try {
+      const result = await pool.query(query, [email]);
+      
+      if (result.rows.length === 0) {
+        return null; // User not found
+      }
+      
+      // Check if role is 'admin'
+      return result.rows[0].role === 'admin';
+    } catch (err) {
+      console.error('Error in checkAdminStatus:', err);
+      throw err;
+    }
+  }
+
+  async getUserTestHistoryCount(email) {
+    const query = `
+      SELECT COUNT(*)
+      FROM registration_tracking
+      WHERE user_email = $1 AND submission_status = 'SUBMITTED';
+    `;
+    try {
+      const result = await pool.query(query, [email]);
+      return parseInt(result.rows[0].count, 10);
+    } catch (err) {
+      console.error('Error in getUserTestHistoryCount:', err);
+      throw err;
+    }
+  }
+
+  async getUserTestHistory(email, limit, offset) {
+    const query = `
+      SELECT 
+        test_id,
+        questions_solved,
+        submitted_at, 
+        user_test_ranking as rank,
+        user_test_duration,
+        user_rating_post_test,
+        user_rating_change
+      FROM registration_tracking
+      WHERE user_email = $1 AND submission_status = 'SUBMITTED'
+      ORDER BY submitted_at DESC
+      LIMIT $2 OFFSET $3;
+    `;
+    try {
+      const result = await pool.query(query, [email, limit, offset]);
+      return result.rows;
+    } catch (err) {
+      console.error('Error in getUserTestHistory:', err);
       throw err;
     }
   }
