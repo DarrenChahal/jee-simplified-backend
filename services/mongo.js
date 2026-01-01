@@ -184,15 +184,39 @@ class MongoService {
         return test;
     }
 
-    async listTests(filters = {}) {
+    async listTests(filters = {}, options = {}) {
         const query = {};
         if (filters.subjects) query.subjects = { $in: [filters.subjects] };
         if (filters.difficulty) query.difficulty = filters.difficulty;
         if (filters.institute) query.institute = filters.institute;
         if (filters.status) query.status = filters.status;
 
-        const documents = await this.#tests().find(query).toArray();
-        return { documents };
+        const total = await this.#tests().countDocuments(query);
+        let cursor = this.#tests().find(query);
+        
+        // Sorting by created_at desc (latest first) makes sense for "past tests" and generally
+        // But adhering strictly to "just add pagination" for now, unless implicit sort is desired.
+        // Let's add latest-first sort as it's standard for lists like this.
+        cursor = cursor.sort({ created_at: -1 });
+
+        if (options.page && options.limit) {
+            const skip = (options.page - 1) * options.limit;
+            cursor = cursor.skip(skip).limit(options.limit);
+        } else if (options.limit) {
+            cursor = cursor.limit(options.limit);
+        }
+
+        const documents = await cursor.toArray();
+        
+        return { 
+            documents,
+            pagination: {
+                total,
+                page: options.page || 1,
+                limit: options.limit || total,
+                totalPages: options.limit ? Math.ceil(total / options.limit) : 1
+            }
+        };
     }
 
     async updateTest(testId, testData) {

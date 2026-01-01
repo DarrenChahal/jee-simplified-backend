@@ -144,13 +144,8 @@ class DatabaseService {
         return mongoService.getTestById(testId);
     }
     
-    /**
-     * Lists tests with optional filters
-     * @param {Object} filters - Optional filters for the query
-     * @returns {Promise<Object>} - The list of test documents
-     */
-    async listTests(filters = {}) {
-        return mongoService.listTests(filters);
+    async listTests(filters = {}, options = {}) {
+        return mongoService.listTests(filters, options);
     }
     
     /**
@@ -228,6 +223,9 @@ class DatabaseService {
 
                 // Ensure non-negative
                 if (user_test_duration < 0) user_test_duration = 0;
+
+                // Convert to seconds
+                user_test_duration = Math.floor(user_test_duration / 1000);
             }
         } catch (err) {
             console.error("Error calculating user_test_duration:", err);

@@ -2,6 +2,7 @@ import database from '../services/database.js';
 import { validateQuestion } from '../validators/questionValidator.js';
 import PubSubPublisher from '../helpers/pubsubPublisher.js';
 import config from '../config/prod.js';
+import questionCache from '../services/questionCache.js';
 
 const pubsubPublisher = new PubSubPublisher(
     config.pubsub.questionWrite.project_id,
@@ -97,12 +98,35 @@ export const questionController = {
             if (difficulty) filters.difficulty = difficulty;
             if (origin) filters.origin = origin;
             if (test_id) filters.test_id = test_id;
+
+            // Generate cache key
+            // We use a stable string representation of the filters
+            // Sorting keys to ensure {a:1, b:2} and {b:2, a:1} generate the same key
+            const cacheKey = `questions:${JSON.stringify(filters, Object.keys(filters).sort())}`;
             
+            // Check cache
+            const cachedQuestions = questionCache.get(cacheKey);
+            if (cachedQuestions) {
+                // console.log(`Question cache hit for: ${cacheKey}`);
+                return res.status(200).json({
+                    success: true,
+                    data: cachedQuestions,
+                    source: 'cache'
+                });
+            }
+            
+            // console.log(`Question cache miss for: ${cacheKey}`);
             const questions = await database.listQuestions(filters);
+            
+            // Store in cache
+            if (questions) {
+                questionCache.set(cacheKey, questions);
+            }
             
             return res.status(200).json({
                 success: true,
-                data: questions
+                data: questions,
+                source: 'database'
             });
         } catch (error) {
             console.error('Error in listQuestions controller:', error);

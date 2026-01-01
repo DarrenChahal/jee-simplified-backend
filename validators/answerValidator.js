@@ -2,12 +2,17 @@ import { z } from 'zod';
 import { ANSWER_STATUS, VERDICT_TYPES, TEST_TYPES, ORIGIN_TYPES } from '../constants.js';
 
 // Test context schema
-const solvedDuringTestSchema = z.object({
-  test_type: z.enum(TEST_TYPES),
-  test_id: z.string().min(1, 'Test ID is required'),
-  duration_passed_when_solved: z.number().int().min(0).nullable(),
-  marked_as: z.enum(ANSWER_STATUS)
-}).nullable();
+const solvedDuringTestSchema = z
+  .union([
+    z.object({}).strict(),
+    z.object({
+      test_type: z.enum(TEST_TYPES),
+      test_id: z.string().min(1, 'Test ID is required'),
+      duration_passed_when_solved: z.number().int().min(0).nullable(),
+      marked_as: z.enum(ANSWER_STATUS)
+    })
+  ])
+  .nullable();
 
 // User answer schema for different types
 const userAnswerSchema = z.object({

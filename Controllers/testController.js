@@ -81,7 +81,7 @@ export const testController = {
     getAllTests: async (req, res) => {
         try {
             // Extract filter parameters from query
-            const { subjects, difficulty, institute, status } = req.query;
+            const { subjects, difficulty, institute, status, page, limit } = req.query;
             
             // Build filters object
             const filters = {};
@@ -89,13 +89,18 @@ export const testController = {
             if (difficulty) filters.difficulty = difficulty;
             if (institute) filters.institute = institute;
             if (status) filters.status = status;
+
+            // Build pagination options
+            const options = {};
+            if (page) options.page = parseInt(page);
+            if (limit) options.limit = parseInt(limit);
             
             // Get tests with filters
-            const tests = await database.listTests(filters);
+            const result = await database.listTests(filters, options);
             
             return res.status(200).json({
                 success: true,
-                data: tests
+                data: result
             });
         } catch (error) {
             console.error('Error in getAllTests controller:', error);
