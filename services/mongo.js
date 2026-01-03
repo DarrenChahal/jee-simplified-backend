@@ -17,7 +17,13 @@ await client.connect();
 const db = client.db(process.env.MONGODB_DB_NAME);
 console.log('MongoDB connection verified successfully');
 
+console.log('MongoDB connection verified successfully');
+
 class MongoService {
+    getDb() {
+        return db;
+    }
+
     #questions() {
         return db.collection('questions');
     }
@@ -193,7 +199,7 @@ class MongoService {
 
         const total = await this.#tests().countDocuments(query);
         let cursor = this.#tests().find(query);
-        
+
         // Sorting by created_at desc (latest first) makes sense for "past tests" and generally
         // But adhering strictly to "just add pagination" for now, unless implicit sort is desired.
         // Let's add latest-first sort as it's standard for lists like this.
@@ -207,8 +213,8 @@ class MongoService {
         }
 
         const documents = await cursor.toArray();
-        
-        return { 
+
+        return {
             documents,
             pagination: {
                 total,
@@ -372,7 +378,7 @@ class MongoService {
         // 2. Subject Stats
         // Note: questions.subject is an ARRAY, need to unwind
         // Also need to handle duplicate answers for same question (best verdict wins)
-        
+
         // First, get total questions per subject
         const totalQuestionsPerSubject = await this.#questions().aggregate([
             { $unwind: '$subjects' },
@@ -383,42 +389,52 @@ class MongoService {
         const userSubjectStatsPipeline = [
             matchStage,
             // Group by question_id to determine best verdict
-            { $group: {
-                _id: '$question_id',
-                hasCorrect: { $max: { $cond: [{ $eq: ['$verdict', 'correct'] }, 1, 0] } },
-                hasIncorrect: { $max: { $cond: [{ $eq: ['$verdict', 'incorrect'] }, 1, 0] } }
-            }},
-            // Determine status: correct if any correct, else incorrect if any incorrect, else attempted
-            { $addFields: {
-                status: {
-                    $cond: [
-                        { $eq: ['$hasCorrect', 1] }, 'correct',
-                        { $cond: [
-                            { $eq: ['$hasIncorrect', 1] }, 'incorrect',
-                            'attempted'
-                        ]}
-                    ]
+            {
+                $group: {
+                    _id: '$question_id',
+                    hasCorrect: { $max: { $cond: [{ $eq: ['$verdict', 'correct'] }, 1, 0] } },
+                    hasIncorrect: { $max: { $cond: [{ $eq: ['$verdict', 'incorrect'] }, 1, 0] } }
                 }
-            }},
+            },
+            // Determine status: correct if any correct, else incorrect if any incorrect, else attempted
+            {
+                $addFields: {
+                    status: {
+                        $cond: [
+                            { $eq: ['$hasCorrect', 1] }, 'correct',
+                            {
+                                $cond: [
+                                    { $eq: ['$hasIncorrect', 1] }, 'incorrect',
+                                    'attempted'
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
             // Lookup question to get subject
-            { $lookup: {
-                from: 'questions',
-                let: { qId: '$_id' },
-                pipeline: [
-                    { $match: { $expr: { $eq: [{ $toString: '$_id' }, '$$qId'] } } }
-                ],
-                as: 'question'
-            }},
+            {
+                $lookup: {
+                    from: 'questions',
+                    let: { qId: '$_id' },
+                    pipeline: [
+                        { $match: { $expr: { $eq: [{ $toString: '$_id' }, '$$qId'] } } }
+                    ],
+                    as: 'question'
+                }
+            },
             { $unwind: { path: '$question', preserveNullAndEmptyArrays: false } },
             // Unwind subjects array (since subjects is an array in questions)
             { $unwind: { path: '$question.subjects', preserveNullAndEmptyArrays: false } },
             // Group by subject
-            { $group: {
-                _id: '$question.subjects',
-                solved: { $sum: 1 },
-                correct: { $sum: { $cond: [{ $eq: ['$status', 'correct'] }, 1, 0] } },
-                incorrect: { $sum: { $cond: [{ $eq: ['$status', 'incorrect'] }, 1, 0] } }
-            }}
+            {
+                $group: {
+                    _id: '$question.subjects',
+                    solved: { $sum: 1 },
+                    correct: { $sum: { $cond: [{ $eq: ['$status', 'correct'] }, 1, 0] } },
+                    incorrect: { $sum: { $cond: [{ $eq: ['$status', 'incorrect'] }, 1, 0] } }
+                }
+            }
         ];
 
         // 3. Weak Topics
@@ -426,55 +442,63 @@ class MongoService {
         const weakTopicsPipeline = [
             matchStage,
             // Group by question_id first
-            { $group: {
-                _id: '$question_id',
-                hasCorrect: { $max: { $cond: [{ $eq: ['$verdict', 'correct'] }, 1, 0] } }
-            }},
+            {
+                $group: {
+                    _id: '$question_id',
+                    hasCorrect: { $max: { $cond: [{ $eq: ['$verdict', 'correct'] }, 1, 0] } }
+                }
+            },
             // Lookup question
-            { $lookup: {
-                from: 'questions',
-                let: { qId: '$_id' },
-                pipeline: [
-                    { $match: { $expr: { $eq: [{ $toString: '$_id' }, '$$qId'] } } }
-                ],
-                as: 'question'
-            }},
+            {
+                $lookup: {
+                    from: 'questions',
+                    let: { qId: '$_id' },
+                    pipeline: [
+                        { $match: { $expr: { $eq: [{ $toString: '$_id' }, '$$qId'] } } }
+                    ],
+                    as: 'question'
+                }
+            },
             { $unwind: { path: '$question', preserveNullAndEmptyArrays: false } },
             // Unwind subjects array
             { $unwind: { path: '$question.subjects', preserveNullAndEmptyArrays: false } },
             // Unwind topics array
             { $unwind: { path: '$question.topics', preserveNullAndEmptyArrays: false } },
             // Group by subject and topic
-            { $group: {
-                _id: { subject: '$question.subjects', topic: '$question.topics' },
-                total: { $sum: 1 },
-                correct: { $sum: '$hasCorrect' }
-            }},
-            { $project: {
-                subject: '$_id.subject',
-                topic: '$_id.topic',
-                accuracy: { 
-                    $cond: [
-                        { $gt: ['$total', 0] },
-                        { $multiply: [{ $divide: ['$correct', '$total'] }, 100] },
-                        0
-                    ]
-                },
-                total: 1
-            }},
+            {
+                $group: {
+                    _id: { subject: '$question.subjects', topic: '$question.topics' },
+                    total: { $sum: 1 },
+                    correct: { $sum: '$hasCorrect' }
+                }
+            },
+            {
+                $project: {
+                    subject: '$_id.subject',
+                    topic: '$_id.topic',
+                    accuracy: {
+                        $cond: [
+                            { $gt: ['$total', 0] },
+                            { $multiply: [{ $divide: ['$correct', '$total'] }, 100] },
+                            0
+                        ]
+                    },
+                    total: 1
+                }
+            },
             { $sort: { accuracy: 1 } },
             { $limit: 5 }
         ];
-        
+
         // 4. Activity Streak (Latest dates)
         const streakPipeline = [
             matchStage,
-            { 
-                $project: { 
-                    date: { 
+            {
+                $project: {
+                    date: {
                         $dateToString: { format: "%Y-%m-%d", date: { $toDate: "$createdAt" } } // using createdAt or submittedAt
-                    } 
-                } 
+                    }
+                }
             },
             { $group: { _id: "$date" } },
             { $sort: { _id: 1 } }
@@ -514,8 +538,8 @@ class MongoService {
         if (!testIds.length) return {};
 
         // 1. Get Test Details
-        const tests = await this.#tests().find({ 
-            _id: { $in: testIds.map(id => new ObjectId(id)) } 
+        const tests = await this.#tests().find({
+            _id: { $in: testIds.map(id => new ObjectId(id)) }
         }).toArray();
 
         // 2. Get Total Questions for each test
@@ -523,7 +547,7 @@ class MongoService {
             { $match: { "origin.test_id": { $in: testIds } } },
             { $group: { _id: "$origin.test_id", total: { $sum: 1 } } }
         ]).toArray();
-        
+
         const countsMap = {};
         questionsCounts.forEach(c => {
             countsMap[c._id] = c.total;
@@ -540,10 +564,68 @@ class MongoService {
                 totalParticipants: test.registered_count || 0
             };
         });
-        
+
         return resultMap;
     }
-}
 
+
+    async saveTestReport(report) {
+        const collection = db.collection('test_reports');
+        const filter = { user_id: report.user_id, test_id: report.test_id };
+        await collection.deleteOne(filter); // Replace existing
+        await collection.insertOne(report);
+        return true;
+    }
+
+    async aggregateUserSubjectsFromReports(userId) {
+        const collection = db.collection('test_reports');
+        const pipeline = [
+            { $match: { user_id: userId } },
+            { $unwind: "$subjects" },
+            {
+                $group: {
+                    _id: "$subjects.subject",
+                    avg_accuracy: { $avg: "$subjects.accuracy" },
+                    tests_taken: { $sum: 1 }
+                }
+            },
+            {
+                $project: {
+                    subject: "$_id",
+                    accuracy: { $round: ["$avg_accuracy", 1] },
+                    tests_taken: 1
+                }
+            }
+        ];
+        return await collection.aggregate(pipeline).toArray();
+    }
+
+    async aggregateUserWeakTopics(userId) {
+        const collection = db.collection('test_reports');
+        const pipeline = [
+            { $match: { user_id: userId } },
+            { $unwind: "$weak_areas" },
+            {
+                $group: {
+                    _id: "$weak_areas.topic",
+                    count: { $sum: 1 },
+                    avg_accuracy: { $avg: "$weak_areas.accuracy" },
+                    subject: { $first: "$weak_areas.subject" }
+                }
+            },
+            { $sort: { count: -1 } }, // Most frequent weak areas first
+            { $limit: 10 },
+            {
+                $project: {
+                    topic: "$_id",
+                    count: 1,
+                    accuracy: { $round: ["$avg_accuracy", 1] },
+                    subject: 1
+                }
+            }
+        ];
+        return await collection.aggregate(pipeline).toArray();
+    }
+}
 const mongoService = new MongoService();
 export default mongoService;

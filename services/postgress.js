@@ -201,7 +201,7 @@ class SQLService {
       FROM app_users u
       WHERE u.user_email = $1;
     `;
-    
+
     // Get latest rating stats
     const statsQuery = `
       SELECT 
@@ -265,14 +265,14 @@ class SQLService {
       FROM app_users
       WHERE user_email = $1;
     `;
-    
+
     try {
       const result = await pool.query(query, [email]);
-      
+
       if (result.rows.length === 0) {
         return null; // User not found
       }
-      
+
       // Check if role is 'admin'
       return result.rows[0].role === 'admin';
     } catch (err) {
@@ -318,6 +318,24 @@ class SQLService {
       console.error('Error in getUserTestHistory:', err);
       throw err;
     }
+  }
+
+  async getSubmittedTests(data) {
+    const { user_email } = data;
+    const result = await pool.query(`
+            SELECT * FROM registration_tracking
+            WHERE user_email = $1 AND submission_status = 'COMPLETED'
+            ORDER BY submitted_at DESC
+        `, [user_email]);
+    return result.rows;
+  }
+
+  async getSubmittedTestRequest(userEmail, testId) {
+    const result = await pool.query(`
+            SELECT * FROM registration_tracking
+            WHERE user_email = $1 AND test_id = $2
+        `, [userEmail, testId]);
+    return result.rows[0];
   }
 }
 
