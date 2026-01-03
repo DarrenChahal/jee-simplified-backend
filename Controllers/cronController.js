@@ -42,37 +42,7 @@ export const cronController = {
         }
     },
 
-    /**
-     * Evaluates a specific test
-     */
-    evaluateTest: async (req, res) => {
-        try {
-            const { test_id } = req.body;
 
-            if (!test_id) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'test_id is required'
-                });
-            }
 
-            console.log(`Cron Job: Evaluating test ${test_id}...`);
-            
-            const stats = await jobs.evaluateTest(test_id);
 
-            return res.status(200).json({
-                success: true,
-                message: `Evaluation completed. Processed ${stats.processedUsers} users.`,
-                stats
-            });
-
-        } catch (error) {
-            console.error('Error in evaluateTest cron job:', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Internal server error during evaluation',
-                error: error.message
-            });
-        }
-    }
 };

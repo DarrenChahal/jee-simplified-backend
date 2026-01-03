@@ -312,13 +312,73 @@ class SQLService {
       LIMIT $2 OFFSET $3;
     `;
     try {
-      const result = await pool.query(query, [email, limit, offset]);
       return result.rows;
     } catch (err) {
       console.error('Error in getUserTestHistory:', err);
       throw err;
     }
   }
+
+  async getUsersForTest(testId) {
+    const query = `
+      SELECT user_email 
+      FROM registration_tracking 
+      WHERE test_id = $1 
+      AND submission_status = 'SUBMITTED'
+      AND evaluation_status = 'PENDING';
+    `;
+    // Note: We only evaluate SUBMITTED tests usually, but if the requirement is to auto-submit, 
+    // we might need to fetch IN_PROGRESS too. Sticking to SUBMITTED based on standard flow.
+    // However, if the cron is "Activate then Complete", users might be in IN_PROGRESS but the test is over. 
+    // Use 'SUBMITTED' for now as per schema "submission_status".
+    
+    try {
+      const result = await pool.query(query, [testId]);
+      return result.rows;
+    } catch (err) {
+      console.error('Error in getUsersForTest:', err);
+      throw err;
+    }
+  }
+
+  async updateEvaluationResults(data) {
+    const { 
+      user_email, 
+      test_id, 
+      questions_solved, 
+      user_test_score 
+    } = data;
+
+    const updated_at = Date.now();
+
+    const query = `
+      UPDATE registration_tracking
+      SET 
+        questions_solved = $3,
+        user_test_score = $4,
+        evaluation_status = 'COMPLETED',
+        updated_at = $5
+      WHERE user_email = $1 AND test_id = $2
+      RETURNING *;
+    `;
+
+    const values = [
+      user_email,
+      test_id,
+      questions_solved,
+      user_test_score,
+      updated_at
+    ];
+
+    try {
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (err) {
+      console.error('Error in updateEvaluationResults:', err);
+      throw err;
+    }
+  }
+
 }
 
 // Export both pool and service

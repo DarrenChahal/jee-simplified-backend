@@ -1,4 +1,5 @@
-import { activateScheduledTestsImpl, completeFinishedTestsImpl, evaluateTestImpl } from './implementations.js';
+import { activateScheduledTestsImpl, completeFinishedTestsImpl } from './implementations.js';
+import { evaluateTestJob } from './evaluateTestJob.js';
 
 class Jobs {
     /**
@@ -23,7 +24,7 @@ class Jobs {
      * @returns {Promise<Object>} Stats about evaluated answers
      */
     async evaluateTest(testId) {
-        return evaluateTestImpl(testId);
+        return evaluateTestJob(testId);
     }
 }
 

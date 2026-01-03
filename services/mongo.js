@@ -68,21 +68,8 @@ class MongoService {
         return question;
     }
 
-    async listQuestions(filters = {}) {
-        const query = {};
-
-        // normal field filters
-        ['subject', 'for_class', 'topic', 'difficulty', 'origin'].forEach(key => {
-            if (filters[key]) query[key] = filters[key];
-        });
-
-        // match inner field origin.test_id
-        if (filters.test_id) {
-            query["origin.test_id"] = filters.test_id;
-        }
-
-        const documents = await this.#questions().find(query).toArray();
-        return { documents };
+    async getQuestionsByTestId(testId) {
+        return this.#questions().find({ "origin.test_id": testId }).toArray();
     }
 
 
@@ -241,10 +228,7 @@ class MongoService {
         return true;
     }
 
-    #answers() {
-        return db.collection('answers');
-    }
-
+    
     async listAnswers(filters = {}) {
         const query = {};
         if (filters.question_id) query.question_id = filters.question_id;
