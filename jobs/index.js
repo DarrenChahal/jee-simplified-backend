@@ -1,5 +1,7 @@
 import { activateScheduledTestsImpl, completeFinishedTestsImpl } from './implementations.js';
 import { evaluateTestJob } from './evaluateTestJob.js';
+import { rankTestJob } from './rankTestJob.js';
+import { rateTestJob } from './rateTestJob.js';
 
 class Jobs {
     /**
@@ -25,6 +27,24 @@ class Jobs {
      */
     async evaluateTest(testId) {
         return evaluateTestJob(testId);
+    }
+
+    /**
+     * Ranks users for a specific test based on their scores
+     * @param {string} testId - The ID of the test to rank
+     * @returns {Promise<Object>} Stats about ranked users
+     */
+    async rankTest(testId) {
+        return rankTestJob(testId);
+    }
+
+    /**
+     * Calculates and updates user ratings for a specific test
+     * @param {string} testId - The ID of the test to rate
+     * @returns {Promise<Object>} Stats about rated users
+     */
+    async rateTest(testId) {
+        return rateTestJob(testId);
     }
 }
 

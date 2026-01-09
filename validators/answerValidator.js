@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ANSWER_STATUS, VERDICT_TYPES, TEST_TYPES, ORIGIN_TYPES } from '../constants.js';
+import { ANSWER_STATUS, VERDICT_TYPES, TEST_TYPES, ORIGIN_TYPES, ANSWER_TYPES } from '../constants.js';
 
 // Test context schema
 const solvedDuringTestSchema = z
@@ -32,7 +32,7 @@ const baseAnswerSchema = z.object({
   verdict: z.enum(VERDICT_TYPES),
   analysis_sheet_id: z.string().optional(),
   submittedAt: z.number().int().nonnegative('submittedAt must be a valid Unix timestamp'),
-  question_type: z.enum(['input', 'single-select', 'multi-select'])
+  question_type: z.enum(ANSWER_TYPES)
 });
 
 // Add refinement to ensure answer matches question type
@@ -57,13 +57,13 @@ const answerSchema = baseAnswerSchema.refine(
              !data.answer.selected_options;
     }
     // For single select questions
-    if (data.question_type === 'single-select') {
+    if (data.question_type === 'single_choice') {
       return typeof data.answer.selected_option === 'number' &&
              !data.answer.input &&
              !data.answer.selected_options;
     }
     // For multi select questions
-    if (data.question_type === 'multi-select') {
+    if (data.question_type === 'multi_choice') {
       return Array.isArray(data.answer.selected_options) &&
              data.answer.selected_options.length > 0 &&
              !data.answer.input &&
