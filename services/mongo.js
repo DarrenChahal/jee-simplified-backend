@@ -44,7 +44,7 @@ class MongoService {
         return db.collection('answers');
     }
 
-    
+
 
 
     async #getNextQuestionNumber() {
@@ -82,7 +82,7 @@ class MongoService {
         if (filters.user_id) query.user_id = filters.user_id;
         if (filters.test_id) query['solved_during_test.test_id'] = filters.test_id;
         if (filters.verdict) query.verdict = filters.verdict;
-        
+
         // Special filter for missing verdict
         if (filters.verdict === null) {
             query.verdict = { $exists: false };
@@ -634,6 +634,19 @@ class MongoService {
             }
         ];
         return await collection.aggregate(pipeline).toArray();
+    }
+
+    async getTestReport(testId, userId) {
+        return db.collection('test_reports').findOne({ test_id: testId, user_id: userId });
+    }
+
+    async saveTestReport(report) {
+        // Upsert: Update if exists, Insert if new
+        await db.collection('test_reports').updateOne(
+            { test_id: report.test_id, user_id: report.user_id },
+            { $set: report },
+            { upsert: true }
+        );
     }
 
     async aggregateUserWeakTopics(userId) {
