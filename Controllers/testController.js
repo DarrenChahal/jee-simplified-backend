@@ -1,5 +1,6 @@
 import database from '../services/database.js';
 import { validateTest } from '../validators/testValidator.js';
+import jobs from '../jobs/index.js';
 
 /**
  * Controller for handling test-related endpoints
@@ -187,6 +188,111 @@ export const testController = {
             return res.status(500).json({
                 success: false,
                 message: 'Failed to delete test',
+                error: error.message
+            });
+        }
+    },
+
+    /**
+     * Evaluate a test by ID
+     * @param {Object} req - Express request object
+     * @param {Object} res - Express response object
+     */
+    evaluateTest: async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            if (!id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Test ID is required'
+                });
+            }
+
+            console.log(`Evaluating test ${id}...`);
+            
+            const stats = await jobs.evaluateTest(id);
+
+            return res.status(200).json({
+                success: true,
+                message: `Evaluation completed. Processed ${stats.processedUsers} users.`,
+                stats
+            });
+        } catch (error) {
+            console.error('Error in evaluateTest controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to evaluate test',
+                error: error.message
+            });
+        }
+    },
+
+    /**
+     * Rank users for a test by ID
+     * @param {Object} req - Express request object
+     * @param {Object} res - Express response object
+     */
+    rankTest: async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            if (!id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Test ID is required'
+                });
+            }
+
+            console.log(`Ranking users for test ${id}...`);
+            
+            const stats = await jobs.rankTest(id);
+
+            return res.status(200).json({
+                success: true,
+                message: `Ranking completed. Ranked ${stats.rankedUsers} users.`,
+                stats
+            });
+        } catch (error) {
+            console.error('Error in rankTest controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to rank users',
+                error: error.message
+            });
+        }
+    },
+
+    /**
+     * Calculate and update user ratings for a test by ID
+     * @param {Object} req - Express request object
+     * @param {Object} res - Express response object
+     */
+    rateTest: async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            if (!id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Test ID is required'
+                });
+            }
+
+            console.log(`Calculating ratings for test ${id}...`);
+            
+            const stats = await jobs.rateTest(id);
+
+            return res.status(200).json({
+                success: true,
+                message: `Rating completed. Rated ${stats.ratedUsers} users.`,
+                stats
+            });
+        } catch (error) {
+            console.error('Error in rateTest controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to calculate ratings',
                 error: error.message
             });
         }
