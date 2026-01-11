@@ -69,7 +69,12 @@ class MongoService {
     }
 
     async getQuestionsByTestId(testId) {
-        return this.#questions().find({ "origin.test_id": testId }).toArray();
+        // Normalize to string to ensure consistency
+        const testIdString = String(testId);
+        console.log(`[MongoDB] Querying questions for test: ${testIdString}`);
+        const questions = await this.#questions().find({ "origin.test_id": testIdString }).toArray();
+        console.log(`[MongoDB] Found ${questions.length} questions for test ${testIdString}`);
+        return questions;
     }
 
 

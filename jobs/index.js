@@ -46,6 +46,26 @@ class Jobs {
     async rateTest(testId) {
         return rateTestJob(testId);
     }
+
+    /**
+     * Processes a single test through the complete pipeline (Evaluate → Rank → Rate)
+     * @param {string} testId - The ID of the test to process
+     * @returns {Promise<Object>} Combined stats from all three operations
+     */
+    async processTest(testId) {
+        const { processTestJob } = await import('./processTestJob.js');
+        return processTestJob(testId);
+    }
+
+    /**
+     * Processes multiple completed tests through the pipeline
+     * @param {string[]} completedTestIds - Array of test IDs to process
+     * @returns {Promise<Object>} Stats about processing results
+     */
+    async processCompletedTests(completedTestIds) {
+        const { processCompletedTestsImpl } = await import('./implementations.js');
+        return processCompletedTestsImpl(completedTestIds);
+    }
 }
 
 const jobs = new Jobs();

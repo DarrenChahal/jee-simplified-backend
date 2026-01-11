@@ -14,6 +14,9 @@ import { sqlService } from '../services/postgress.js';
  * @returns {Promise<Object>} Statistics
  */
 export const evaluateTestJob = async (testId) => {
+    // Normalize test ID to string for consistency
+    testId = String(testId);
+    
     const stats = {
         processedUsers: 0,
         gradedAnswers: 0,
@@ -21,10 +24,13 @@ export const evaluateTestJob = async (testId) => {
     };
 
     console.log(`[Job] Starting evaluation for test: ${testId}`);
+    console.log(`[Job] Test ID type: ${typeof testId}, value: ${JSON.stringify(testId)}`);
 
     try {
         
         const questions = await database.getQuestionsByTestId(testId);
+        console.log(`[Job] Query returned ${questions.length} questions for test ${testId}`);
+        console.log(`[Job] Sample question (if any):`, questions[0] ? { id: questions[0]._id, origin: questions[0].origin } : 'none');
 
         if (questions.length === 0) {
             console.log(`[Job] No questions found for test ${testId}. Aborting.`);

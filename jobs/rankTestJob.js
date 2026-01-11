@@ -12,6 +12,9 @@ import { sqlService } from '../services/postgress.js';
  * @returns {Promise<Object>} Statistics about the ranking operation
  */
 export const rankTestJob = async (testId) => {
+    // Normalize test ID to string for consistency
+    testId = String(testId);
+    
     const stats = {
         rankedUsers: 0,
         errors: []

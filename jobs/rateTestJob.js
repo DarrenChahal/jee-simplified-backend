@@ -15,6 +15,9 @@ import { sqlService } from '../services/postgress.js';
  * @returns {Promise<Object>} Statistics about the rating operation
  */
 export const rateTestJob = async (testId) => {
+    // Normalize test ID to string for consistency
+    testId = String(testId);
+    
     const stats = {
         ratedUsers: 0,
         errors: []

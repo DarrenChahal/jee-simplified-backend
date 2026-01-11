@@ -31,7 +31,7 @@ export async function activateScheduledTestsImpl() {
                         updated_at: now
                     });
                     stats.activatedCount++;
-                    stats.activatedTestIds.push(test._id);
+                    stats.activatedTestIds.push(String(test._id));
                     console.log(`[Job] Activated test: ${test.title} (${test._id})`);
                 } catch (err) {
                     console.error(`[Job] Failed to activate test ${test._id}:`, err);
@@ -83,7 +83,7 @@ export async function completeFinishedTestsImpl() {
                         updated_at: now
                     });
                     stats.completedCount++;
-                    stats.completedTestIds.push(test._id);
+                    stats.completedTestIds.push(String(test._id));
                     console.log(`[Job] Completed test: ${test.title} (${test._id})`);
                 } catch (err) {
                     console.error(`[Job] Failed to complete test ${test._id}:`, err);
@@ -105,3 +105,49 @@ export async function completeFinishedTestsImpl() {
  * @returns {Promise<Object>} Stats about evaluated answers
  */
 
+import { processTestJob } from './processTestJob.js';
+
+/**
+ * Processes completed tests through the full pipeline (Evaluate → Rank → Rate)
+ * 
+ * This function takes test IDs returned by completeFinishedTestsImpl() and processes
+ * each one through the complete evaluation pipeline. Each test is processed independently,
+ * so errors in one test don't block processing of others.
+ * 
+ * @param {string[]} completedTestIds - Array of test IDs that just completed
+ * @returns {Promise<Object>} Stats about processing results
+ */
+export async function processCompletedTestsImpl(completedTestIds) {
+    const stats = {
+        totalTests: completedTestIds.length,
+        successful: [],
+        failed: [],
+        results: []
+    };
+
+    if (completedTestIds.length === 0) {
+        console.log('[Job] No completed tests to process.');
+        return stats;
+    }
+
+    console.log(`[Job] Starting processing for ${completedTestIds.length} completed test(s)...`);
+
+    for (const testId of completedTestIds) {
+        try {
+            console.log(`[Job] Processing test ${testId}...`);
+            const result = await processTestJob(testId);
+            stats.successful.push(testId);
+            stats.results.push(result);
+            console.log(`[Job] ✅ Successfully processed test ${testId}`);
+        } catch (error) {
+            console.error(`[Job] ❌ Failed to process test ${testId}:`, error);
+            stats.failed.push({
+                testId,
+                error: error.message
+            });
+        }
+    }
+
+    console.log(`[Job] Processing complete. Success: ${stats.successful.length}, Failed: ${stats.failed.length}`);
+    return stats;
+}
