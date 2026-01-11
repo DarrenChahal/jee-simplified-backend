@@ -76,9 +76,10 @@ class AnalyticsService {
                 topics.forEach(top => {
                     if (!top) return;
                     // Topic often needs Subject context, but simple aggregation for now
-                    if (!topicStats[top]) topicStats[top] = { total: 0, correct: 0, subject: subjects[0] };
+                    if (!topicStats[top]) topicStats[top] = { total: 0, correct: 0, time: 0, subject: subjects[0] };
                     topicStats[top].total++;
                     if (isCorrect) topicStats[top].correct++;
+                    topicStats[top].time += timeTaken;
                 });
 
 
@@ -118,7 +119,10 @@ class AnalyticsService {
                 return {
                     subject: sub,
                     accuracy: s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0,
-                    avg_time: s.total > 0 ? Math.round(s.time / s.total) : 0
+                    avg_time: s.total > 0 ? Math.round(s.time / s.total) : 0,
+                    // New fields for Effort Analysis
+                    total_time_spent: s.time, // Total seconds spent on this subject
+                    correct_answers: s.correct // Number of correct answers (proxy for score)
                 };
             });
 
@@ -136,6 +140,19 @@ class AnalyticsService {
                 .filter(t => t.accuracy < 60)
                 .sort((a, b) => a.accuracy - b.accuracy) // Lowest accuracy first
                 .slice(0, 5);
+
+            // D. All Topics (for detailed Effort Analysis)
+            const processedTopics = Object.keys(topicStats).map(top => {
+                const t = topicStats[top];
+                return {
+                    topic: top,
+                    subject: t.subject,
+                    accuracy: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0,
+                    avg_time: t.total > 0 ? Math.round(t.time / t.total) : 0,
+                    total_time_spent: t.time,
+                    correct_answers: t.correct
+                };
+            });
 
 
             // 4. Comparative / Peer Analytics (SQL)
@@ -172,6 +189,7 @@ class AnalyticsService {
 
                 // 3. Subject Mastery
                 subjects: processedSubjects,
+                topics: processedTopics, // Newly added
 
                 // 4. Weak Areas
                 weak_areas: weakAreas,

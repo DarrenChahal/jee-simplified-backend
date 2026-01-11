@@ -600,6 +600,19 @@ class MongoService {
         return await collection.aggregate(pipeline).toArray();
     }
 
+    async getTestReport(testId, userId) {
+        return db.collection('test_reports').findOne({ test_id: testId, user_id: userId });
+    }
+
+    async saveTestReport(report) {
+        // Upsert: Update if exists, Insert if new
+        await db.collection('test_reports').updateOne(
+            { test_id: report.test_id, user_id: report.user_id },
+            { $set: report },
+            { upsert: true }
+        );
+    }
+
     async aggregateUserWeakTopics(userId) {
         const collection = db.collection('test_reports');
         const pipeline = [
