@@ -45,6 +45,8 @@ class MongoService {
     }
 
 
+
+
     async #getNextQuestionNumber() {
         const result = await this.#systemCounters().findOneAndUpdate(
             { _id: 'lastQuestionNumber' },
@@ -72,6 +74,40 @@ class MongoService {
         const question = await this.#questions().findOne({ _id: new ObjectId(questionId) });
         if (!question) throw new Error('Question not found');
         return question;
+    }
+
+    async listAnswers(filters = {}) {
+        const query = {};
+        if (filters.question_id) query.question_id = filters.question_id;
+        if (filters.user_id) query.user_id = filters.user_id;
+        if (filters.test_id) query['solved_during_test.test_id'] = filters.test_id;
+        if (filters.verdict) query.verdict = filters.verdict;
+
+        // Special filter for missing verdict
+        if (filters.verdict === null) {
+            query.verdict = { $exists: false };
+        }
+
+        const documents = await this.#answers().find(query).toArray();
+        return { documents };
+    }
+
+    async updateAnswer(answerId, answerData) {
+        const updatedData = {
+            ...answerData,
+            updated_at: Date.now()
+        };
+        await this.#answers().updateOne({ _id: new ObjectId(answerId) }, { $set: updatedData });
+        return this.#answers().findOne({ _id: new ObjectId(answerId) });
+    }
+
+    async getQuestionsByTestId(testId) {
+        // Normalize to string to ensure consistency
+        const testIdString = String(testId);
+        console.log(`[MongoDB] Querying questions for test: ${testIdString}`);
+        const questions = await this.#questions().find({ "origin.test_id": testIdString }).toArray();
+        console.log(`[MongoDB] Found ${questions.length} questions for test ${testIdString}`);
+        return questions;
     }
 
     async listQuestions(filters = {}) {

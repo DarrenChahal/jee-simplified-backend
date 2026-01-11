@@ -124,6 +124,7 @@ class SQLService {
     const values = [email];
 
     try {
+
       const result = await pool.query(query, values);
       return result.rows;
     } catch (err) {
@@ -201,7 +202,7 @@ class SQLService {
       FROM app_users u
       WHERE u.user_email = $1;
     `;
-
+    
     // Get latest rating stats
     const statsQuery = `
       SELECT 
@@ -265,14 +266,14 @@ class SQLService {
       FROM app_users
       WHERE user_email = $1;
     `;
-
+    
     try {
       const result = await pool.query(query, [email]);
-
+      
       if (result.rows.length === 0) {
         return null; // User not found
       }
-
+      
       // Check if role is 'admin'
       return result.rows[0].role === 'admin';
     } catch (err) {
@@ -320,6 +321,192 @@ class SQLService {
     }
   }
 
+  async getUsersForTest(testId) {
+    const query = `
+      SELECT user_email 
+      FROM registration_tracking 
+      WHERE test_id = $1 
+      AND submission_status = 'SUBMITTED'
+      AND evaluation_status = 'PENDING';
+    `;
+    // Note: We only evaluate SUBMITTED tests usually, but if the requirement is to auto-submit, 
+    // we might need to fetch IN_PROGRESS too. Sticking to SUBMITTED based on standard flow.
+    // However, if the cron is "Activate then Complete", users might be in IN_PROGRESS but the test is over. 
+    // Use 'SUBMITTED' for now as per schema "submission_status".
+    
+    try {
+      const result = await pool.query(query, [testId]);
+      return result.rows;
+    } catch (err) {
+      console.error('Error in getUsersForTest:', err);
+      throw err;
+    }
+  }
+
+  async updateEvaluationResults(data) {
+    const { 
+      user_email, 
+      test_id, 
+      questions_solved, 
+      user_test_score 
+    } = data;
+
+    const updated_at = Date.now();
+
+    const query = `
+      UPDATE registration_tracking
+      SET 
+        questions_solved = $3,
+        user_test_score = $4,
+        evaluation_status = 'COMPLETED',
+        updated_at = $5
+      WHERE user_email = $1 AND test_id = $2
+      RETURNING *;
+    `;
+
+    const values = [
+      user_email,
+      test_id,
+      questions_solved,
+      user_test_score,
+      updated_at
+    ];
+
+    try {
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (err) {
+      console.error('Error in updateEvaluationResults:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Get all evaluated users for a test, sorted for ranking
+   * @param {string} testId - The test ID
+   * @returns {Promise<Array>} Users sorted by score (desc) and duration (asc)
+   */
+  async getEvaluatedUsersForRanking(testId) {
+    const query = `
+      SELECT 
+        user_email,
+        user_test_score,
+        user_test_duration
+      FROM registration_tracking
+      WHERE test_id = $1
+        AND evaluation_status = 'COMPLETED'
+      ORDER BY user_test_score DESC, user_test_duration ASC;
+    `;
+
+    try {
+      const result = await pool.query(query, [testId]);
+      return result.rows;
+    } catch (err) {
+      console.error('Error in getEvaluatedUsersForRanking:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Update user ranking for a test
+   * @param {Object} data - { user_email, test_id, user_test_ranking }
+   * @returns {Promise<Object>} Updated registration row
+   */
+  async updateUserRanking(data) {
+    const { user_email, test_id, user_test_ranking } = data;
+    const updated_at = Date.now();
+
+    const query = `
+      UPDATE registration_tracking
+      SET 
+        user_test_ranking = $3,
+        updated_at = $4
+      WHERE user_email = $1 AND test_id = $2
+      RETURNING *;
+    `;
+
+    const values = [user_email, test_id, user_test_ranking, updated_at];
+
+    try {
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (err) {
+      console.error('Error in updateUserRanking:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Get all ranked users for a test with their previous ratings
+   * @param {string} testId - The test ID
+   * @returns {Promise<Array>} Users with scores and previous ratings
+   */
+  async getRankedUsersForRating(testId) {
+    const query = `
+      WITH user_previous_rating AS (
+        SELECT 
+          user_email,
+          user_rating_post_test,
+          submitted_at,
+          ROW_NUMBER() OVER (PARTITION BY user_email ORDER BY submitted_at DESC) as rn
+        FROM registration_tracking
+        WHERE submission_status = 'SUBMITTED'
+          AND user_rating_post_test IS NOT NULL
+      )
+      SELECT 
+        rt.user_email,
+        rt.user_test_score,
+        rt.user_test_ranking,
+        COALESCE(upr.user_rating_post_test, 0) as previous_rating
+      FROM registration_tracking rt
+      LEFT JOIN user_previous_rating upr 
+        ON rt.user_email = upr.user_email 
+        AND upr.rn = 1
+        AND upr.submitted_at < rt.submitted_at
+      WHERE rt.test_id = $1
+        AND rt.evaluation_status = 'COMPLETED'
+      ORDER BY rt.user_test_ranking ASC;
+    `;
+
+    try {
+      const result = await pool.query(query, [testId]);
+      return result.rows;
+    } catch (err) {
+      console.error('Error in getRankedUsersForRating:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Update user rating for a test
+   * @param {Object} data - { user_email, test_id, user_rating_change, user_rating_post_test }
+   * @returns {Promise<Object>} Updated registration row
+   */
+  async updateUserRating(data) {
+    const { user_email, test_id, user_rating_change, user_rating_post_test } = data;
+    const updated_at = Date.now();
+
+    const query = `
+      UPDATE registration_tracking
+      SET 
+        user_rating_change = $3,
+        user_rating_post_test = $4,
+        updated_at = $5
+      WHERE user_email = $1 AND test_id = $2
+      RETURNING *;
+    `;
+
+    const values = [user_email, test_id, user_rating_change, user_rating_post_test, updated_at];
+
+    try {
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (err) {
+      console.error('Error in updateUserRating:', err);
+      throw err;
+    }
+  }
+
   async getSubmittedTests(data) {
     const { user_email } = data;
     const result = await pool.query(`
@@ -337,7 +524,12 @@ class SQLService {
         `, [userEmail, testId]);
     return result.rows[0];
   }
+
+
 }
+
+
+
 
 // Export both pool and service
 export const sqlService = new SQLService();
