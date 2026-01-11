@@ -124,6 +124,7 @@ class SQLService {
     const values = [email];
 
     try {
+
       const result = await pool.query(query, values);
       return result.rows;
     } catch (err) {
@@ -312,6 +313,7 @@ class SQLService {
       LIMIT $2 OFFSET $3;
     `;
     try {
+      const result = await pool.query(query, [email, limit, offset]);
       return result.rows;
     } catch (err) {
       console.error('Error in getUserTestHistory:', err);
@@ -505,7 +507,29 @@ class SQLService {
     }
   }
 
+  async getSubmittedTests(data) {
+    const { user_email } = data;
+    const result = await pool.query(`
+            SELECT * FROM registration_tracking
+            WHERE user_email = $1 AND submission_status = 'COMPLETED'
+            ORDER BY submitted_at DESC
+        `, [user_email]);
+    return result.rows;
+  }
+
+  async getSubmittedTestRequest(userEmail, testId) {
+    const result = await pool.query(`
+            SELECT * FROM registration_tracking
+            WHERE user_email = $1 AND test_id = $2
+        `, [userEmail, testId]);
+    return result.rows[0];
+  }
+
+
 }
+
+
+
 
 // Export both pool and service
 export const sqlService = new SQLService();

@@ -1,6 +1,7 @@
 import mongoService from './mongo.js';
-import {sqlService} from './postgress.js';
+import { sqlService } from './postgress.js';
 import adminCache from './adminCache.js';
+import { analyticsService } from './analyticsService.js';
 
 class DatabaseService {
     /**
@@ -11,7 +12,7 @@ class DatabaseService {
     async createQuestion(questionData) {
         return mongoService.createQuestion(questionData);
     }
-    
+
     /**
      * Gets a question by ID
      * @param {string} questionId - The ID of the question to retrieve
@@ -20,7 +21,7 @@ class DatabaseService {
     async getQuestionById(questionId) {
         return mongoService.getQuestionById(questionId);
     }
-    
+
     /**
      * Lists questions with optional filters
      * @param {Object} filters - Optional filters for the query
@@ -29,7 +30,7 @@ class DatabaseService {
     async listQuestions(filters = {}) {
         return mongoService.listQuestions(filters);
     }
-    
+
     /**
      * Updates a question by ID
      * @param {string} questionId - The ID of the question to update
@@ -39,7 +40,7 @@ class DatabaseService {
     async updateQuestion(questionId, questionData) {
         return mongoService.updateQuestion(questionId, questionData);
     }
-    
+
     /**
      * Deletes a question by ID
      * @param {string} questionId - The ID of the question to delete
@@ -49,14 +50,14 @@ class DatabaseService {
         return mongoService.deleteQuestion(questionId);
     }
 
-    async addTestRegistration(testId){
+    async addTestRegistration(testId) {
         return mongoService.addTestRegistration(testId);
     }
 
-    async removeTestRegistration(testId){
+    async removeTestRegistration(testId) {
         return mongoService.removeTestRegistration(testId);
     }
-    
+
     // Answer-related methods
     async createAnswer(answerData) {
         return mongoService.createOrUpdateAnswer(answerData);
@@ -77,7 +78,7 @@ class DatabaseService {
     async deleteAnswer(id) {
         return mongoService.deleteAnswer(id);
     }
-    
+
     // Template-related methods
     /**
      * Creates a new template in the database
@@ -87,7 +88,7 @@ class DatabaseService {
     async createTemplate(templateData) {
         return mongoService.createTemplate(templateData);
     }
-    
+
     /**
      * Gets a template by ID
      * @param {string} templateId - The ID of the template to retrieve
@@ -96,7 +97,7 @@ class DatabaseService {
     async getTemplateById(templateId) {
         return mongoService.getTemplateById(templateId);
     }
-    
+
     /**
      * Lists templates with optional filters
      * @param {Object} filters - Optional filters for the query
@@ -105,7 +106,7 @@ class DatabaseService {
     async listTemplates(filters = {}) {
         return mongoService.listTemplates(filters);
     }
-    
+
     /**
      * Updates a template by ID
      * @param {string} templateId - The ID of the template to update
@@ -115,7 +116,7 @@ class DatabaseService {
     async updateTemplate(templateId, templateData) {
         return mongoService.updateTemplate(templateId, templateData);
     }
-    
+
     /**
      * Deletes a template by ID
      * @param {string} templateId - The ID of the template to delete
@@ -124,7 +125,7 @@ class DatabaseService {
     async deleteTemplate(templateId) {
         return mongoService.deleteTemplate(templateId);
     }
-    
+
     // Test-related methods
     /**
      * Creates a new test in the database
@@ -134,7 +135,7 @@ class DatabaseService {
     async createTest(testData) {
         return mongoService.createTest(testData);
     }
-    
+
     /**
      * Gets a test by ID
      * @param {string} testId - The ID of the test to retrieve
@@ -143,11 +144,11 @@ class DatabaseService {
     async getTestById(testId) {
         return mongoService.getTestById(testId);
     }
-    
+
     async listTests(filters = {}, options = {}) {
         return mongoService.listTests(filters, options);
     }
-    
+
     /**
      * Updates a test by ID
      * @param {string} testId - The ID of the test to update
@@ -157,7 +158,7 @@ class DatabaseService {
     async updateTest(testId, testData) {
         return mongoService.updateTest(testId, testData);
     }
-    
+
     /**
      * Deletes a test by ID
      * @param {string} testId - The ID of the test to delete
@@ -171,7 +172,7 @@ class DatabaseService {
         return sqlService.registerForTest(data);
     }
 
-    async unregisterForTest(data){
+    async unregisterForTest(data) {
         return sqlService.unregisterForTest(data);
     }
 
@@ -191,7 +192,7 @@ class DatabaseService {
             // 1. Get Test Details for scheduled start time
             // We use mongoService directly as it's imported
             const test = await mongoService.getTestById(test_id);
-            
+
             // Handle test_date format (detect if seconds or ms)
             let testStartTime = 0;
             if (test.test_date) {
@@ -233,9 +234,15 @@ class DatabaseService {
             // We'll log it and let duration be 0 or keep partial calculation.
         }
 
-        return sqlService.submitTest({ 
-            ...data, 
-            user_test_duration 
+        return sqlService.submitTest({
+            ...data,
+            user_test_duration
+        }).then(result => {
+            // Async: Generate Analytics Report
+            analyticsService.generateTestReport(test_id, user_email).catch(err => {
+                console.error(`Background analytics generation failed for test ${test_id}:`, err);
+            });
+            return result;
         });
     }
 
@@ -279,21 +286,21 @@ class DatabaseService {
         // 3. Parallel Fetch: Rating History & Answer Stats
         const [ratingHistory, answerStats] = await Promise.all([
             this.getUserRatingHistory(email),
-            this.getUserAnswerStats(userIds) 
+            this.getUserAnswerStats(userIds)
         ]);
 
         // 4. Calculate Derived Metrics (Streak)
         const activityDates = answerStats.activity; // ["2024-01-01", "2024-01-02"] sorted ASC
-        
+
         let currentStreak = 0;
         let longestStreak = 0;
-        
+
         if (activityDates.length > 0) {
             // --- Current Streak Calculation ---
             const today = new Date().toISOString().split('T')[0];
             const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
             const lastActive = activityDates[activityDates.length - 1];
-            
+
             if (lastActive === today || lastActive === yesterday) {
                 currentStreak = 1;
                 // Walk backwards for current streak
@@ -301,8 +308,8 @@ class DatabaseService {
                     const curr = new Date(activityDates[i]);
                     const prev = new Date(activityDates[i - 1]);
                     const diffTime = Math.abs(curr - prev);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                    
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
                     if (diffDays === 1) {
                         currentStreak++;
                     } else if (diffDays === 0) {
@@ -316,7 +323,7 @@ class DatabaseService {
             // --- Longest Streak Calculation ---
             let tempStreak = 1;
             longestStreak = 1; // At least 1 if there is activity
-            
+
             for (let i = 1; i < activityDates.length; i++) {
                 const curr = new Date(activityDates[i]);
                 const prev = new Date(activityDates[i - 1]);
@@ -326,7 +333,7 @@ class DatabaseService {
                 if (diffDays === 1) {
                     tempStreak++;
                 } else if (diffDays > 1) {
-                     // Gap found, reset
+                    // Gap found, reset
                     longestStreak = Math.max(longestStreak, tempStreak);
                     tempStreak = 1;
                 }
@@ -337,8 +344,8 @@ class DatabaseService {
 
         // Avatar Initials
         const getAvatarInitials = (name) => {
-             if (!name) return "";
-             return name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            if (!name) return "";
+            return name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2);
         };
 
         return {
@@ -369,7 +376,7 @@ class DatabaseService {
                 airPercentile: 0,
                 percentileLabel: "Unranked",
                 // Avg Speed: Questions per Minute
-                avgSpeedPerQuestion: (answerStats.overall.timeSpent > 0 && answerStats.overall.totalQuestions > 0) 
+                avgSpeedPerQuestion: (answerStats.overall.timeSpent > 0 && answerStats.overall.totalQuestions > 0)
                     ? parseFloat((answerStats.overall.totalQuestions / (answerStats.overall.timeSpent / 1000 / 60)).toFixed(1))
                     : 0
             },
@@ -405,7 +412,7 @@ class DatabaseService {
 
         // 2. Get Paginated History from SQL
         const history = await sqlService.getUserTestHistory(email, limit, offset);
-        
+
         if (history.length === 0) {
             return {
                 total,
@@ -422,20 +429,20 @@ class DatabaseService {
 
         // 4. Merge
         const results = history.map(h => {
-             const details = detailsMap[h.test_id] || {};
-             
-             return {
-                 testId: h.test_id,
-                 title: details.title || "Unknown Test",
-                 submittedAt: parseInt(h.submitted_at),
-                 ratingAfterTest: h.user_rating_post_test || 0,
-                 ratingChange: h.user_rating_change || 0,
-                 timeTaken: h.user_test_duration || 0, 
-                 questionsSolved: h.questions_solved || 0,
-                 totalQuestions: details.totalQuestions || 0,
-                 rank: h.rank || 0,
-                 totalParticipants: details.totalParticipants || 0
-             };
+            const details = detailsMap[h.test_id] || {};
+
+            return {
+                testId: h.test_id,
+                title: details.title || "Unknown Test",
+                submittedAt: parseInt(h.submitted_at),
+                ratingAfterTest: h.user_rating_post_test || 0,
+                ratingChange: h.user_rating_change || 0,
+                timeTaken: h.user_test_duration || 0,
+                questionsSolved: h.questions_solved || 0,
+                totalQuestions: details.totalQuestions || 0,
+                rank: h.rank || 0,
+                totalParticipants: details.totalParticipants || 0
+            };
         });
 
         return {
@@ -451,22 +458,31 @@ class DatabaseService {
         // Check cache first
         const cacheKey = `admin:${email}`;
         const cachedStatus = adminCache.get(cacheKey);
-        
+
         if (cachedStatus !== undefined) {
             console.log(`Admin status cache hit for: ${email}`);
             return cachedStatus;
         }
-        
+
         // Cache miss - query database
         console.log(`Admin status cache miss for: ${email}`);
         const isAdmin = await sqlService.checkAdminStatus(email);
-        
+
         // Store in cache (even if null/false)
         if (isAdmin !== null) {
             adminCache.set(cacheKey, isAdmin);
         }
-        
+
         return isAdmin;
+    }
+
+
+    async getUserDashboardAnalytics(email) {
+        return analyticsService.getDashboardAnalytics(email);
+    }
+
+    async getTestAnalyticsReport(testId, email) {
+        return analyticsService.getTestReport(testId, email);
     }
 }
 
