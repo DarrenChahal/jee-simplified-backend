@@ -251,7 +251,7 @@ class SQLService {
     try {
       const result = await pool.query(query, [email]);
       return result.rows.map(row => ({
-        date: new Date(parseInt(row.date)).toLocaleString('default', { month: 'short' }),
+        date: new Date(parseInt(row.date)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
         rating: row.rating
       }));
     } catch (err) {
@@ -507,15 +507,7 @@ class SQLService {
     }
   }
 
-  async getSubmittedTests(data) {
-    const { user_email } = data;
-    const result = await pool.query(`
-            SELECT * FROM registration_tracking
-            WHERE user_email = $1 AND submission_status = 'COMPLETED'
-            ORDER BY submitted_at DESC
-        `, [user_email]);
-    return result.rows;
-  }
+
 
   async getSubmittedTestRequest(userEmail, testId) {
     const result = await pool.query(`
