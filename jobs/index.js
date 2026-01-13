@@ -48,6 +48,16 @@ class Jobs {
     }
 
     /**
+     * Regenerates analytics reports for a test
+     * @param {string} testId 
+     * @returns {Promise<Object>} Stats
+     */
+    async generateAnalytics(testId) {
+        const { generateAnalyticsJob } = await import('./generateAnalyticsJob.js');
+        return generateAnalyticsJob(testId);
+    }
+
+    /**
      * Processes a single test through the complete pipeline (Evaluate → Rank → Rate)
      * @param {string} testId - The ID of the test to process
      * @returns {Promise<Object>} Combined stats from all three operations

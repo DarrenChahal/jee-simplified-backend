@@ -76,9 +76,10 @@ class AnalyticsService {
                 topics.forEach(top => {
                     if (!top) return;
                     // Topic often needs Subject context, but simple aggregation for now
-                    if (!topicStats[top]) topicStats[top] = { total: 0, correct: 0, subject: subjects[0] };
+                    if (!topicStats[top]) topicStats[top] = { total: 0, correct: 0, time: 0, subject: subjects[0] };
                     topicStats[top].total++;
                     if (isCorrect) topicStats[top].correct++;
+                    topicStats[top].time += timeTaken;
                 });
 
 
@@ -89,7 +90,7 @@ class AnalyticsService {
 
                 if (!timeBuckets[bucketIndex]) {
                     timeBuckets[bucketIndex] = {
-                        slot: `${bucketIndex * 15}-${(bucketIndex + 1) * 15}m`,
+                        slotIndex: bucketIndex,
                         total: 0,
                         correct: 0,
                         timeSum: 0
@@ -104,8 +105,10 @@ class AnalyticsService {
             // --- CALCULATIONS ---
 
             // A. Time Performance Dip Array
-            const timePerformance = Object.values(timeBuckets).map(b => ({
-                slot: b.slot,
+            const timePerformance = Object.values(timeBuckets)
+            .sort((a, b) => a.slotIndex - b.slotIndex)
+            .map(b => ({
+                slot: `${b.slotIndex * 15}-${(b.slotIndex + 1) * 15} min`,
                 accuracy: b.total > 0 ? Math.round((b.correct / b.total) * 100) : 0,
                 avg_time: b.total > 0 ? Math.round(b.timeSum / b.total) : 0,
                 total_questions: b.total
@@ -118,19 +121,31 @@ class AnalyticsService {
                 return {
                     subject: sub,
                     accuracy: s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0,
-                    avg_time: s.total > 0 ? Math.round(s.time / s.total) : 0
+                    total_time_spent: s.time,
+                    correct_answers: s.correct,
+                    total_questions: s.total
+                };
+            });
+            
+            // C. Topics Analysis
+            const processedTopics = Object.keys(topicStats).map(top => {
+                const t = topicStats[top];
+                return {
+                    topic: top,
+                    subject: t.subject,
+                    total_time_spent: t.time,
+                    correct_answers: t.correct
                 };
             });
 
-            // C. Weak Areas (Topics < 60% accuracy)
+            // D. Weak Areas (Topics < 60% accuracy)
             const weakAreas = Object.keys(topicStats)
                 .map(top => {
                     const t = topicStats[top];
                     return {
                         topic: top,
                         subject: t.subject,
-                        accuracy: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0,
-                        total_attempts: t.total
+                        accuracy: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0
                     };
                 })
                 .filter(t => t.accuracy < 60)
@@ -167,20 +182,23 @@ class AnalyticsService {
                     accuracy: answers.length > 0 ? Math.round((totalCorrect / answers.length) * 100) : 0
                 },
 
-                // 2. The "Dip"
+                // 2. Strategy
+                strategy: {
+                    time_wasted: timeWasted, 
+                    avg_speed: answers.length > 0 ? Math.round(totalTimeSpent / answers.length) : 0
+                },
+
+                // 3. The "Dip"
                 time_performance: timePerformance,
 
-                // 3. Subject Mastery
+                // 4. Subject Mastery
                 subjects: processedSubjects,
+                
+                // 5. Topics
+                topics: processedTopics,
 
-                // 4. Weak Areas
-                weak_areas: weakAreas,
-
-                // 5. Strategy
-                strategy: {
-                    time_wasted: timeWasted, // Seconds spent on wrong answers
-                    avg_speed: answers.length > 0 ? Math.round(totalTimeSpent / answers.length) : 0
-                }
+                // 6. Weak Areas
+                weak_areas: weakAreas
             };
 
             // STORE IN MONGO
