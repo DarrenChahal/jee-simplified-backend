@@ -237,15 +237,47 @@ class AnalyticsService {
         const bestRank = history.length > 0 ? Math.min(...history.map(h => h.rank)) : 0;
 
         // 4. Construct Payload matching Frontend ProfileProps
-        // 5. Recent Tests for Activity Feed
-        const recentTests = history.map(h => ({
-            id: h.test_id,
-            type: 'test',
-            title: `Test #${h.test_id.slice(-6)}`, // Placeholder title until we join with test details
-            description: `Score: ${h.user_test_score}`,
-            time: new Date(parseInt(h.submitted_at)).toLocaleDateString(),
-            score: `${h.user_test_score}/40` // Mock max score for now or fetch it
-        }));
+        // 5. Recent Tests for Activity Feed - Fetch test details from MongoDB
+        const testIds = history.map(h => h.test_id);
+        let testDetailsMap = {};
+        
+        if (testIds.length > 0) {
+            try {
+                // Fetch test details from MongoDB for all test IDs
+                const tests = await mongoService.getDb().collection('tests').find({
+                    _id: { $in: testIds.map(id => new ObjectId(id)) }
+                }).toArray();
+                
+                // Create a map for easy lookup
+                tests.forEach(test => {
+                    testDetailsMap[test._id.toString()] = test;
+                });
+            } catch (err) {
+                console.error('Error fetching test details for analytics:', err);
+                // Continue with empty map - will fall back to placeholder titles
+            }
+        }
+        
+        const recentTests = history.map(h => {
+            const testDetails = testDetailsMap[h.test_id];
+            const totalMarks = testDetails?.max_score || (h.questions_solved * 4) || 40;
+            
+            // Spread all MongoDB test details and add PostgreSQL data
+            return {
+                ...testDetails,  // All MongoDB fields (title, description, subjects, difficulty, etc.)
+                id: h.test_id,
+                type: 'test',
+                // Override/add fields from PostgreSQL
+                user_score: h.user_test_score || 0,
+                score_display: `${h.user_test_score || 0}/${totalMarks}`,
+                submitted_at: h.submitted_at,
+                submission_time: new Date(parseInt(h.submitted_at)).toLocaleDateString(),
+                user_test_ranking: h.rank,
+                user_test_duration: h.user_test_duration,
+                user_rating_post_test: h.user_rating_post_test,
+                user_rating_change: h.user_rating_change
+            };
+        });
 
         return {
             user: {

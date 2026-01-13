@@ -301,6 +301,7 @@ class SQLService {
     const query = `
       SELECT 
         test_id,
+        user_test_score,
         questions_solved,
         submitted_at, 
         user_test_ranking as rank,
