@@ -117,7 +117,7 @@ export const userController = {
 
             // Update submission status in database
             const result = await database.submitTest(validatedSubmissionData);
-
+            console.log("Result in submitTest controller",result)
             return res.status(200).json({
                 success: true,
                 message: 'Test submitted successfully',
@@ -138,6 +138,7 @@ export const userController = {
             const requestData = req.body;
 
             // Validate request data
+            //console.log("Request data in getSubmittedTests controller",requestData)
             const validation = validateSubmittedTestsRequest(requestData);
             if (!validation.isValid) {
                 return res.status(400).json({
@@ -149,7 +150,7 @@ export const userController = {
 
             // Get submitted tests from database
             const submittedTestIds = await database.getSubmittedTests(validatedRequestData);
-
+            //console.log("Submitted test ids ",submittedTestIds)
             return res.status(200).json({
                 success: true,
                 data: submittedTestIds
