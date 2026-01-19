@@ -90,7 +90,7 @@ class AnalyticsService {
 
                 if (!timeBuckets[bucketIndex]) {
                     timeBuckets[bucketIndex] = {
-                        slot: `${bucketIndex * 15}-${(bucketIndex + 1) * 15}m`,
+                        slotIndex: bucketIndex,
                         total: 0,
                         correct: 0,
                         timeSum: 0
@@ -105,8 +105,10 @@ class AnalyticsService {
             // --- CALCULATIONS ---
 
             // A. Time Performance Dip Array
-            const timePerformance = Object.values(timeBuckets).map(b => ({
-                slot: b.slot,
+            const timePerformance = Object.values(timeBuckets)
+            .sort((a, b) => a.slotIndex - b.slotIndex)
+            .map(b => ({
+                slot: `${b.slotIndex * 15}-${(b.slotIndex + 1) * 15} min`,
                 accuracy: b.total > 0 ? Math.round((b.correct / b.total) * 100) : 0,
                 avg_time: b.total > 0 ? Math.round(b.timeSum / b.total) : 0,
                 total_questions: b.total
@@ -119,40 +121,36 @@ class AnalyticsService {
                 return {
                     subject: sub,
                     accuracy: s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0,
-                    avg_time: s.total > 0 ? Math.round(s.time / s.total) : 0,
-                    // New fields for Effort Analysis
-                    total_time_spent: s.time, // Total seconds spent on this subject
-                    correct_answers: s.correct // Number of correct answers (proxy for score)
+                    total_time_spent: s.time,
+                    correct_answers: s.correct,
+                    total_questions: s.total
+                };
+            });
+            
+            // C. Topics Analysis
+            const processedTopics = Object.keys(topicStats).map(top => {
+                const t = topicStats[top];
+                return {
+                    topic: top,
+                    subject: t.subject,
+                    total_time_spent: t.time,
+                    correct_answers: t.correct
                 };
             });
 
-            // C. Weak Areas (Topics < 60% accuracy)
+            // D. Weak Areas (Topics < 60% accuracy)
             const weakAreas = Object.keys(topicStats)
                 .map(top => {
                     const t = topicStats[top];
                     return {
                         topic: top,
                         subject: t.subject,
-                        accuracy: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0,
-                        total_attempts: t.total
+                        accuracy: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0
                     };
                 })
                 .filter(t => t.accuracy < 60)
                 .sort((a, b) => a.accuracy - b.accuracy) // Lowest accuracy first
                 .slice(0, 5);
-
-            // D. All Topics (for detailed Effort Analysis)
-            const processedTopics = Object.keys(topicStats).map(top => {
-                const t = topicStats[top];
-                return {
-                    topic: top,
-                    subject: t.subject,
-                    accuracy: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0,
-                    avg_time: t.total > 0 ? Math.round(t.time / t.total) : 0,
-                    total_time_spent: t.time,
-                    correct_answers: t.correct
-                };
-            });
 
 
             // 4. Comparative / Peer Analytics (SQL)
@@ -184,21 +182,23 @@ class AnalyticsService {
                     accuracy: answers.length > 0 ? Math.round((totalCorrect / answers.length) * 100) : 0
                 },
 
-                // 2. The "Dip"
+                // 2. Strategy
+                strategy: {
+                    time_wasted: timeWasted, 
+                    avg_speed: answers.length > 0 ? Math.round(totalTimeSpent / answers.length) : 0
+                },
+
+                // 3. The "Dip"
                 time_performance: timePerformance,
 
-                // 3. Subject Mastery
+                // 4. Subject Mastery
                 subjects: processedSubjects,
-                topics: processedTopics, // Newly added
+                
+                // 5. Topics
+                topics: processedTopics,
 
-                // 4. Weak Areas
-                weak_areas: weakAreas,
-
-                // 5. Strategy
-                strategy: {
-                    time_wasted: timeWasted, // Seconds spent on wrong answers
-                    avg_speed: answers.length > 0 ? Math.round(totalTimeSpent / answers.length) : 0
-                }
+                // 6. Weak Areas
+                weak_areas: weakAreas
             };
 
             // STORE IN MONGO
@@ -255,15 +255,47 @@ class AnalyticsService {
         const bestRank = history.length > 0 ? Math.min(...history.map(h => h.rank)) : 0;
 
         // 4. Construct Payload matching Frontend ProfileProps
-        // 5. Recent Tests for Activity Feed
-        const recentTests = history.map(h => ({
-            id: h.test_id,
-            type: 'test',
-            title: `Test #${h.test_id.slice(-6)}`, // Placeholder title until we join with test details
-            description: `Score: ${h.user_test_score}`,
-            time: new Date(parseInt(h.submitted_at)).toLocaleDateString(),
-            score: `${h.user_test_score}/40` // Mock max score for now or fetch it
-        }));
+        // 5. Recent Tests for Activity Feed - Fetch test details from MongoDB
+        const testIds = history.map(h => h.test_id);
+        let testDetailsMap = {};
+        
+        if (testIds.length > 0) {
+            try {
+                // Fetch test details from MongoDB for all test IDs
+                const tests = await mongoService.getDb().collection('tests').find({
+                    _id: { $in: testIds.map(id => new ObjectId(id)) }
+                }).toArray();
+                
+                // Create a map for easy lookup
+                tests.forEach(test => {
+                    testDetailsMap[test._id.toString()] = test;
+                });
+            } catch (err) {
+                console.error('Error fetching test details for analytics:', err);
+                // Continue with empty map - will fall back to placeholder titles
+            }
+        }
+        
+        const recentTests = history.map(h => {
+            const testDetails = testDetailsMap[h.test_id];
+            const totalMarks = testDetails?.max_score || (h.questions_solved * 4) || 40;
+            
+            // Spread all MongoDB test details and add PostgreSQL data
+            return {
+                ...testDetails,  // All MongoDB fields (title, description, subjects, difficulty, etc.)
+                id: h.test_id,
+                type: 'test',
+                // Override/add fields from PostgreSQL
+                user_score: h.user_test_score || 0,
+                score_display: `${h.user_test_score || 0}/${totalMarks}`,
+                submitted_at: h.submitted_at,
+                submission_time: new Date(parseInt(h.submitted_at)).toLocaleDateString(),
+                user_test_ranking: h.rank,
+                user_test_duration: h.user_test_duration,
+                user_rating_post_test: h.user_rating_post_test,
+                user_rating_change: h.user_rating_change
+            };
+        });
 
         return {
             user: {

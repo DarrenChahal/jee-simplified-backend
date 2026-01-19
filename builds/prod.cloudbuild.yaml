@@ -1,14 +1,67 @@
-steps:
-  # Access the service account secret
-  - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'access-secret'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "Fetching secret..."
-        gcloud secrets versions access latest --secret=${_SVC_ACCOUNT_JSON} > config.json
+# steps:
+#   # Access the service account secret
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     id: 'access-secret'
+#     entrypoint: 'bash'
+#     args:
+#       - '-c'
+#       - |
+#         echo "Fetching secret..."
+#         gcloud secrets versions access latest --secret=${_SVC_ACCOUNT_JSON} > config.json
 
+#   # Fetch the .env secret
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     id: 'access-env'
+#     entrypoint: 'bash'
+#     args:
+#       - '-c'
+#       - |
+#         echo "Fetching .env file..."
+#         gcloud secrets versions access latest --secret=${_ENV_SECRET_NAME} > .env
+
+#   # Activate service account
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     id: 'use-service-account'
+#     entrypoint: 'bash'
+#     args:
+#       - '-c'
+#       - |
+#         gcloud auth activate-service-account --key-file=config.json
+
+#   # Build the container image
+#   - name: 'gcr.io/cloud-builders/docker'
+#     args: ['build', '-t', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--build-arg', 'GOOGLE_APPLICATION_CREDENTIALS=config.json', '-f', '${_DOCKERFILE}', '.']
+
+#   # Push the container image to Container Registry
+#   - name: 'gcr.io/cloud-builders/docker'
+#     args: ['push', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}']
+
+#   # Deploy main API service to Cloud Run
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     args: ['run', 'deploy', '${_SERVICE_NAME}', '--image', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--region', 'us-central1', '--platform', 'managed']
+  
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     args: ['run', 'services', 'update-traffic', '${_SERVICE_NAME}', '--to-latest', '--region', 'us-central1']  
+
+#   # Deploy PubSub service to Cloud Run
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     args: ['run', 'deploy', '${_SERVICE_NAME_PUBSUB}', '--image', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--region', 'us-central1', '--platform', 'managed']
+  
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     args: ['run', 'services', 'update-traffic', '${_SERVICE_NAME_PUBSUB}', '--to-latest', '--region', 'us-central1']
+
+# substitutions:
+#   _PROJECT_ID: 'solveiit'
+#   _IMAGE_NAME: 'solveiit-backend'
+#   _AUTO_TAG: '1.0.0'
+#   _DOCKERFILE: 'prod.Dockerfile'
+#   _SERVICE_NAME: 'solveiit-api'
+#   _SERVICE_NAME_PUBSUB: 'solveiit-pubsub'
+#   _SVC_ACCOUNT_JSON: 'solveiit'
+#   _ENV_SECRET_NAME: 'env-file'
+
+# # Run: gcloud builds submit --config=builds/prod.cloudbuild.yaml
+steps:
   # Fetch the .env secret
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'access-env'
@@ -19,45 +72,55 @@ steps:
         echo "Fetching .env file..."
         gcloud secrets versions access latest --secret=${_ENV_SECRET_NAME} > .env
 
-  # Activate service account
-  - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'use-service-account'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        gcloud auth activate-service-account --key-file=config.json
-
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--build-arg', 'GOOGLE_APPLICATION_CREDENTIALS=config.json', '-f', '${_DOCKERFILE}', '.']
+    args:
+      - build
+      - -t
+      - us-central1-docker.pkg.dev/${_PROJECT_ID}/solveiit-backend/${_IMAGE_NAME}:${_AUTO_TAG}
+      - -f
+      - ${_DOCKERFILE}
+      - .
 
-  # Push the container image to Container Registry
+  # Push the image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}']
+    args:
+      - push
+      - us-central1-docker.pkg.dev/${_PROJECT_ID}/solveiit-backend/${_IMAGE_NAME}:${_AUTO_TAG}
 
-  # Deploy main API service to Cloud Run
+  # Deploy main API service
   - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['run', 'deploy', '${_SERVICE_NAME}', '--image', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--region', 'us-central1', '--platform', 'managed']
-  
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['run', 'services', 'update-traffic', '${_SERVICE_NAME}', '--to-latest', '--region', 'us-central1']  
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image
+      - us-central1-docker.pkg.dev/${_PROJECT_ID}/solveiit-backend/${_IMAGE_NAME}:${_AUTO_TAG}
+      - --region
+      - us-central1
+      - --platform
+      - managed
+      - --allow-unauthenticated
 
-  # Deploy PubSub service to Cloud Run
+  # Deploy PubSub service
   - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['run', 'deploy', '${_SERVICE_NAME_PUBSUB}', '--image', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_AUTO_TAG}', '--region', 'us-central1', '--platform', 'managed']
-  
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['run', 'services', 'update-traffic', '${_SERVICE_NAME_PUBSUB}', '--to-latest', '--region', 'us-central1']
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME_PUBSUB}
+      - --image
+      - us-central1-docker.pkg.dev/${_PROJECT_ID}/solveiit-backend/${_IMAGE_NAME}:${_AUTO_TAG}
+      - --region
+      - us-central1
+      - --platform
+      - managed
+      - --allow-unauthenticated
 
 substitutions:
-  _PROJECT_ID: 'jeesimplified-476009'
-  _IMAGE_NAME: 'jee-simplified-backend'
+  _PROJECT_ID: 'solveiit'
+  _IMAGE_NAME: 'solveiit-backend'
   _AUTO_TAG: '1.0.0'
   _DOCKERFILE: 'prod.Dockerfile'
-  _SERVICE_NAME: 'jee-simplified-api'
-  _SERVICE_NAME_PUBSUB: 'jee-simplified-pubsub'
-  _SVC_ACCOUNT_JSON: 'jee-simplified-1'
+  _SERVICE_NAME: 'solveiit-api'
+  _SERVICE_NAME_PUBSUB: 'solveiit-pubsub'
   _ENV_SECRET_NAME: 'env-file'
-
-# Run: gcloud builds submit --config=builds/prod.cloudbuild.yaml

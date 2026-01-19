@@ -1,5 +1,5 @@
 # Use Node.js LTS as base image
-FROM node:18.20.7
+FROM node:20
 
 # Set working directory
 WORKDIR /app
@@ -8,18 +8,16 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm i
+RUN npm ci --omit=dev
 
 # Copy the rest of the application
 COPY . .
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV GCLOUD_PROJECT_ID=jeesimplified-476009
-ARG GOOGLE_APPLICATION_CREDENTIALS
-ENV GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS
+ENV GCLOUD_PROJECT_ID=solveiit
 
-# Expose the port that your application listens on
+# Cloud Run listens on 8080
 EXPOSE 8080
 
 # Start the application
