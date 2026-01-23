@@ -3,6 +3,8 @@ import { validateQuestion } from '../validators/questionValidator.js';
 import PubSubPublisher from '../helpers/pubsubPublisher.js';
 import config from '../config/prod.js';
 import questionCache from '../services/questionCache.js';
+import { uploadFileToGCS } from '../helpers/storageHelper.js';
+
 
 const pubsubPublisher = new PubSubPublisher(
     config.pubsub.questionWrite.project_id,
@@ -20,7 +22,53 @@ export const questionController = {
      */
     createQuestion: async (req, res) => {
         try {
-            const questionData = req.body;
+            // Check if it's a multipart request (multer populates req.files or req.file)
+            // If header is application/json, it proceeds as before (backward compatibility if needed, but user asked to switch)
+            // We'll extract fields assuming they might be stringified JSON if coming from form-data
+
+            let questionData = { ...req.body };
+            
+            // 1. Process stringified JSON fields if present
+            const jsonFields = ['subjects', 'topics', 'options', 'origin', 'existing_images', 'answer', 'for_class', 'tags', 'attachments'];
+            jsonFields.forEach(field => {
+                if (typeof questionData[field] === 'string') {
+                    try {
+                        questionData[field] = JSON.parse(questionData[field]);
+                    } catch (e) {
+                        console.warn(`Failed to parse JSON for field ${field}:`, e.message);
+                        // deciding whether to error out or keep as string. 
+                        // The prompt implies explicit JSON.parse is needed.
+                    }
+                }
+            });
+
+            // 2. Handle image uploads
+            const uploadedImageUrls = [];
+            if (req.files && Array.isArray(req.files)) {
+                const uploadPromises = req.files.map(file => 
+                    uploadFileToGCS(file.buffer, file.originalname, file.mimetype)
+                );
+                const urls = await Promise.all(uploadPromises);
+                uploadedImageUrls.push(...urls);
+            }
+
+            // 3. Merge existing images and key mapping
+            // ensuring images is an array
+            const finalImages = [
+                ...(Array.isArray(questionData.existing_images) ? questionData.existing_images : []),
+                ...uploadedImageUrls
+            ];
+            
+            // Map images to attachments as per schema expectations
+            if (finalImages.length > 0) {
+                 const currentAttachments = Array.isArray(questionData.attachments) ? questionData.attachments : [];
+                 questionData.attachments = [...currentAttachments, ...finalImages];
+            }
+            
+            // Clean up temporary fields
+            delete questionData.existing_images;
+            // delete questionData.images; // Optional if we want to be explicit, but safeParse strips it anyway. Keeping it clean.
+
             
             // Validate question data
             const validation = validateQuestion(questionData);
