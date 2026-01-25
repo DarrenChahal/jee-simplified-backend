@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --omit=dev
+RUN npm i
 
 # Copy the rest of the application
 COPY . .
@@ -16,8 +16,10 @@ COPY . .
 # Set environment variables
 ENV NODE_ENV=production
 ENV GCLOUD_PROJECT_ID=solveiit
+ARG GOOGLE_APPLICATION_CREDENTIALS
+ENV GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS
 
-# Cloud Run listens on 8080
+# Expose the port that your application listens on
 EXPOSE 8080
 
 # Start the application
