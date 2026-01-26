@@ -149,8 +149,8 @@ export const userController = {
             const validatedRequestData = validation.data;
 
             // Get submitted tests from database
-            //const submittedTestIds = await database.getSubmittedTests(validatedRequestData);
-            console.log("Submitted test ids ",submittedTestIds)
+            const submittedTestIds = await database.getSubmittedTests(validatedRequestData);
+            //console.log("Submitted test ids ",submittedTestIds)
             return res.status(200).json({
                 success: true,
                 data: submittedTestIds
