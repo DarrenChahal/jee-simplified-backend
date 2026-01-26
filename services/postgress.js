@@ -508,15 +508,7 @@ class SQLService {
     }
   }
 
-  async getSubmittedTests(data) {
-    const { user_email } = data;
-    const result = await pool.query(`
-            SELECT * FROM registration_tracking
-            WHERE user_email = $1 AND submission_status = 'COMPLETED'
-            ORDER BY submitted_at DESC
-        `, [user_email]);
-    return result.rows;
-  }
+
 
   async getSubmittedTestRequest(userEmail, testId) {
     const result = await pool.query(`
