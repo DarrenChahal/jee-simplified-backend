@@ -16,6 +16,15 @@ import { sqlService } from '../services/postgress.js';
 export const evaluateTestJob = async (testId) => {
     // Normalize test ID to string for consistency
     testId = String(testId);
+
+    // Fetch test details to get marking scheme
+    let markingScheme = {};
+    try {
+        const test = await database.getTestById(testId);
+        markingScheme = test.marking_scheme || {};
+    } catch (error) {
+        console.warn(`[Job] Could not fetch test details for ${testId}, using default marking scheme.`);
+    }
     
     const stats = {
         processedUsers: 0,
@@ -83,14 +92,26 @@ export const evaluateTestJob = async (testId) => {
                     
                     const correctVal = question.answer.correct_answer;
 
+                    // Determine points based on type and marking scheme
+                    // Question types from constants: 'single_choice', 'multi_choice', 'input'
+                    const qType = question.answer ? question.answer.type : 'single_choice';
+                    const typeScheme = markingScheme[qType];
+                    
+                    // Default values if scheme not provided:
+                    // single_choice: +4 / -1
+                    // multi_choice:  +4 / -1
+                    // input:         +4 / 0
+                    const correctScore = typeScheme?.correct ?? 4;
+                    const incorrectScore = typeScheme?.incorrect ?? (qType === 'input' ? 0 : -1);
+
                     // Loose equality check (handles string vs number differences if any)
                     if (userVal == correctVal) { 
                         verdict = 'correct';
-                        points = 4;
+                        points = correctScore;
                         correctCount++;
                     } else {
                         verdict = 'incorrect';
-                        points = -1; // Default penalty
+                        points = incorrectScore; 
                     }
 
                     /*

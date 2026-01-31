@@ -29,6 +29,20 @@ const testSchema = z.object({
     bucket_path: z.string().optional(), // Auto-generated, so it's optional in validation
     questions_collection_name: z.string().optional(), // Auto-generated, so it's optional in validation
     registered_count: z.number().int().nonnegative().default(0),
+    marking_scheme: z.object({
+        single_choice: z.object({
+            correct: z.number().default(4),
+            incorrect: z.number().default(-1)
+        }).optional(),
+        multi_choice: z.object({
+            correct: z.number().default(4),
+            incorrect: z.number().default(-2)
+        }).optional(),
+        input: z.object({
+            correct: z.number().default(4),
+            incorrect: z.number().default(0)
+        }).optional()
+    }).optional(),
     max_score: z.number().nonnegative().optional(),
     questions: z.number().int().nonnegative(),
 });
