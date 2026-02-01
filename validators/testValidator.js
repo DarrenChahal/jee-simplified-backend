@@ -38,10 +38,6 @@ const testSchema = z.object({
             correct: z.number().default(4),
             incorrect: z.number().default(-2)
         }).optional(),
-        input: z.object({
-            correct: z.number().default(4),
-            incorrect: z.number().default(0)
-        }).optional(),
         integer: z.object({
             correct: z.number().default(4),
             incorrect: z.number().default(0)
