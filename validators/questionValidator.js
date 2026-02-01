@@ -37,36 +37,22 @@ const answerBaseSchema = z.object({
 });
 
 const inputAnswerSchema = answerBaseSchema.extend({
-  type: z.literal('input'),
-  correct_answer: z.string().min(1, 'Correct answer is required'),
+  type: z.literal('integer'),
+  correct_answer: z.coerce.number().int('Correct answer must be an integer').min(0, 'Correct answer must be non-negative'), // Assuming non-negative, adjust if negative answers allowed
   options: z.array(z.string()).optional().default([]),
 });
 
 const singleChoiceAnswerSchema = answerBaseSchema.extend({
   type: z.literal('single_choice'),
   options: z.array(z.string()).min(2, 'Single-choice questions must have at least 2 options'),
-  correct_answer: z.string()
-    .transform((val, ctx) => {
-      const parsed = parseInt(val, 10);
-      if (isNaN(parsed)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Correct option must be a number',
-        });
-        return z.NEVER;
-      }
-      return parsed;
-    })
-    .refine((val) => val >= 0, {
-      message: 'Correct option index must be provided',
-    }),
+  correct_answer: z.coerce.number().int().nonnegative('Correct option index must be provided'),
 });
 
 
 const multiChoiceAnswerSchema = answerBaseSchema.extend({
   type: z.literal('multi_choice'),
   options: z.array(z.string()).min(2, 'Multi-choice questions must have at least 2 options'),
-  correct_answer: z.array(z.number().int().min(0)).min(1, 'At least one correct option must be provided'),
+  correct_answer: z.array(z.coerce.number().int().min(0)).min(1, 'At least one correct option must be provided'),
 });
 
 const answerSchema = z.discriminatedUnion('type', [

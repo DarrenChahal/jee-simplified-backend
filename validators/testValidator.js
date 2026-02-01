@@ -41,6 +41,10 @@ const testSchema = z.object({
         input: z.object({
             correct: z.number().default(4),
             incorrect: z.number().default(0)
+        }).optional(),
+        integer: z.object({
+            correct: z.number().default(4),
+            incorrect: z.number().default(0)
         }).optional()
     }).optional(),
     max_score: z.number().nonnegative().optional(),

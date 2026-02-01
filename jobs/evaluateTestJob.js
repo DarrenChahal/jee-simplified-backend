@@ -93,18 +93,19 @@ export const evaluateTestJob = async (testId) => {
                     const correctVal = question.answer.correct_answer;
 
                     // Determine points based on type and marking scheme
-                    // Question types from constants: 'single_choice', 'multi_choice', 'input'
+                    // Question types from constants: 'single_choice', 'multi_choice', 'integer'
                     const qType = question.answer ? question.answer.type : 'single_choice';
                     const typeScheme = markingScheme[qType];
                     
                     // Default values if scheme not provided:
                     // single_choice: +4 / -1
                     // multi_choice:  +4 / -1
-                    // input:         +4 / 0
+                    // integer:       +4 / 0
                     const correctScore = typeScheme?.correct ?? 4;
-                    const incorrectScore = typeScheme?.incorrect ?? (qType === 'input' ? 0 : -1);
+                    const incorrectScore = typeScheme?.incorrect ?? (qType === 'integer' ? 0 : -1);
 
                     // Loose equality check (handles string vs number differences if any)
+                    // Note: with strict typing, correctVal is number, userVal might be coming from payload as number too
                     if (userVal == correctVal) { 
                         verdict = 'correct';
                         points = correctScore;

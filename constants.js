@@ -10,7 +10,7 @@ export const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics'];
 export const CLASS_LEVELS = ['11', '12', 'dropper'];
 export const DIFFICULTY_LEVELS = ['Easy', 'Medium', 'Hard'];
 export const ORIGIN_TYPES = ['platform', 'mock', 'prev_year'];
-export const ANSWER_TYPES = ['input', 'single_choice', 'multi_choice'];
+export const ANSWER_TYPES = ['integer', 'single_choice', 'multi_choice'];
 
 
 // Answer validation constants
