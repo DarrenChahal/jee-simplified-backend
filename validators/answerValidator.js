@@ -50,7 +50,7 @@ const answerSchema = baseAnswerSchema.refine(
 
     // Otherwise (answered or review-answered), validate content
     // For input type questions
-    if (data.question_type === 'input') {
+    if (data.question_type === 'integer') {
       return typeof data.answer.input === 'string' && 
              data.answer.input.length > 0 &&
              !data.answer.selected_option &&
